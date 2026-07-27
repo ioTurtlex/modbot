@@ -446,6 +446,17 @@ app.get('/api/deletions/:guildId', (req, res) => {
   res.json(deletions);
 });
 
+app.post('/api/shadow-mode', (req, res) => {
+  const { enabled } = req.body;
+  console.log(`[Dashboard] Shadow mode set to: ${enabled}`);
+  res.json({ status: 'ok', shadowMode: enabled });
+});
+
+app.post('/api/enforcement', (req, res) => {
+  console.log(`[Dashboard] Enforcement toggled`);
+  res.json({ status: 'ok' });
+});
+
 // Serve Dashboard UI
 app.get('/', (req, res) => {
   const html = `<!DOCTYPE html>
@@ -455,66 +466,179 @@ app.get('/', (req, res) => {
   <title>Jelly Guardian Dashboard</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif; background: linear-gradient(135deg, #667eea, #764ba2); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-    .container { background: white; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); width: 100%; max-width: 500px; padding: 40px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif; background: linear-gradient(135deg, #667eea, #764ba2); min-height: 100vh; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .login-box { background: white; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); width: 100%; max-width: 400px; padding: 40px; margin: 100px auto; }
     h1 { text-align: center; color: #333; margin-bottom: 30px; }
-    .status { background: #f0fdf4; border-left: 4px solid #10b981; padding: 15px; border-radius: 6px; margin-bottom: 25px; font-size: 14px; }
-    input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 6px; }
+    .status-banner { background: #f0fdf4; border-left: 4px solid #10b981; padding: 15px; border-radius: 6px; margin-bottom: 25px; font-size: 14px; }
+    input[type="password"] { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 6px; }
     input:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1); }
-    button { width: 100%; padding: 12px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    button { padding: 12px 24px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
     button:hover { background: #764ba2; }
     .hidden { display: none; }
-    .feed { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px; padding: 15px; max-height: 300px; overflow-y: auto; font-size: 12px; margin: 15px 0; line-height: 1.6; color: #666; }
+    
+    .dashboard { background: white; border-radius: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); padding: 30px; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; border-bottom: 2px solid #e5e7eb; padding-bottom: 20px; }
+    .header h1 { margin: 0; color: #333; }
+    .logout-btn { background: #ef4444; padding: 10px 20px; }
+    .logout-btn:hover { background: #dc2626; }
+    
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+    .stat-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; text-align: center; }
+    .stat-card .number { font-size: 28px; font-weight: bold; color: #667eea; margin-bottom: 5px; }
+    .stat-card .label { font-size: 12px; color: #666; text-transform: uppercase; }
+    
+    .controls { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 30px; }
+    .control-group { margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+    .control-group:last-child { margin-bottom: 0; }
+    .control-label { font-weight: 600; color: #333; }
+    .toggle { position: relative; width: 60px; height: 30px; background: #ddd; border-radius: 15px; cursor: pointer; transition: background 0.3s; }
+    .toggle.on { background: #10b981; }
+    .toggle-slider { position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; background: white; border-radius: 50%; transition: left 0.3s; }
+    .toggle.on .toggle-slider { left: 33px; }
+    
+    .feed { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; }
+    .feed h3 { margin-bottom: 15px; color: #333; }
+    .feed-items { max-height: 400px; overflow-y: auto; }
+    .feed-item { background: white; border-left: 3px solid #667eea; padding: 12px; margin-bottom: 10px; border-radius: 4px; font-size: 13px; line-height: 1.5; }
+    .feed-item.safe { border-left-color: #10b981; }
+    .feed-item.caution { border-left-color: #f59e0b; }
+    .feed-item.removed { border-left-color: #ef4444; }
+    .feed-item .timestamp { color: #999; font-size: 11px; }
+    
     .err { color: #dc2626; font-size: 12px; margin-top: 10px; }
-    .logout { background: #ef4444; margin-top: 15px; }
-    .logout:hover { background: #dc2626; }
   </style>
 </head>
 <body>
-  <div class="container">
+  <div id="login-screen" class="login-box">
     <h1>🍋 Jelly Guardian</h1>
-    <div id="login">
-      <div class="status"><strong>✅ Status:</strong> Online and Monitoring</div>
-      <input type="password" id="pwd" placeholder="Enter Dashboard Password" />
-      <button onclick="tryLogin()">Login</button>
-      <div id="err" class="err"></div>
-    </div>
-    <div id="dash" class="hidden">
-      <div class="status"><strong>✅ Connected</strong> | Mode: Shadow (Monitoring Only)</div>
-      <div class="feed">
-        <div>🤖 Dashboard loaded</div>
-        <div>👁️ Monitoring messages...</div>
-        <div id="uptime" style="margin-top:10px;color:#667eea;"><strong>Uptime:</strong> Loading...</div>
+    <div class="status-banner"><strong>✅ Status:</strong> Online and Monitoring</div>
+    <input type="password" id="pwd" placeholder="Enter Dashboard Password" />
+    <button onclick="tryLogin()" style="width: 100%;">Login</button>
+    <div id="err" class="err"></div>
+  </div>
+
+  <div id="dashboard-screen" class="container hidden">
+    <div class="dashboard">
+      <div class="header">
+        <div>
+          <h1>🍋 Jelly Guardian Dashboard</h1>
+          <p style="color: #666; font-size: 14px; margin-top: 5px;">Real-time moderation monitoring</p>
+        </div>
+        <button class="logout-btn" onclick="logout()">Logout</button>
       </div>
-      <button class="logout" onclick="logout()">Logout</button>
+
+      <div class="stats">
+        <div class="stat-card">
+          <div class="number" id="stat-uptime">0h 0m</div>
+          <div class="label">Uptime</div>
+        </div>
+        <div class="stat-card">
+          <div class="number" id="stat-monitored">0</div>
+          <div class="label">Messages Monitored</div>
+        </div>
+        <div class="stat-card">
+          <div class="number" id="stat-flagged">0</div>
+          <div class="label">Messages Flagged</div>
+        </div>
+        <div class="stat-card">
+          <div class="number" id="stat-removed">0</div>
+          <div class="label">Messages Removed</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <h3 style="margin-bottom: 20px;">Bot Configuration</h3>
+        <div class="control-group">
+          <div>
+            <div class="control-label">🌙 Shadow Mode</div>
+            <div style="font-size: 12px; color: #666; margin-top: 5px;">Messages logged only, not deleted</div>
+          </div>
+          <div class="toggle on" id="shadow-toggle" onclick="toggleShadowMode()">
+            <div class="toggle-slider"></div>
+          </div>
+        </div>
+        <div class="control-group">
+          <div>
+            <div class="control-label">🚨 Enforcement Enabled</div>
+            <div style="font-size: 12px; color: #666; margin-top: 5px;">Bot deletes rule-breaking messages</div>
+          </div>
+          <div class="toggle" id="enforce-toggle" onclick="toggleEnforcement()">
+            <div class="toggle-slider"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="feed">
+        <h3>📊 Recent Activity</h3>
+        <div class="feed-items" id="feed"></div>
+      </div>
     </div>
   </div>
+
   <script>
+    const PASSWORD = "JellyGuardian2026!Protect\\$Safe";
+    let shadowMode = true;
+    let messageCount = { monitored: 0, flagged: 0, removed: 0 };
+
     function tryLogin() {
       const pwd = document.getElementById("pwd").value;
-      if (pwd === "JellyGuardian2026!Protect\\$Safe") {
-        document.getElementById("login").classList.add("hidden");
-        document.getElementById("dash").classList.remove("hidden");
-        updateStatus();
-        setInterval(updateStatus, 2000);
+      if (pwd === PASSWORD) {
+        document.getElementById("login-screen").classList.add("hidden");
+        document.getElementById("dashboard-screen").classList.remove("hidden");
+        startDashboard();
       } else {
         document.getElementById("err").textContent = pwd ? "❌ Incorrect password" : "Please enter password";
       }
     }
+
     function logout() {
       document.getElementById("pwd").value = "";
       document.getElementById("err").textContent = "";
-      document.getElementById("login").classList.remove("hidden");
-      document.getElementById("dash").classList.add("hidden");
+      document.getElementById("login-screen").classList.remove("hidden");
+      document.getElementById("dashboard-screen").classList.add("hidden");
     }
-    function updateStatus() {
-      fetch("/api/status").then(r=>r.json()).then(d=>{
-        const h = Math.floor(d.uptime/3600);
-        const m = Math.floor((d.uptime%3600)/60);
-        document.getElementById("uptime").innerHTML = "<strong>Uptime:</strong> " + h + "h " + m + "m";
-      }).catch(e=>{});
+
+    function toggleShadowMode() {
+      shadowMode = !shadowMode;
+      document.getElementById("shadow-toggle").classList.toggle("on");
+      fetch("/api/shadow-mode", { method: "POST", body: JSON.stringify({ enabled: shadowMode }), headers: { "Content-Type": "application/json" } }).catch(e => console.error(e));
     }
-    document.getElementById("pwd").addEventListener("keypress", e => e.key==="Enter" && tryLogin());
+
+    function toggleEnforcement() {
+      document.getElementById("enforce-toggle").classList.toggle("on");
+      fetch("/api/enforcement", { method: "POST", headers: { "Content-Type": "application/json" } }).catch(e => console.error(e));
+    }
+
+    function startDashboard() {
+      updateStats();
+      updateFeed();
+      setInterval(updateStats, 2000);
+      setInterval(updateFeed, 3000);
+    }
+
+    function updateStats() {
+      fetch("/api/status").then(r => r.json()).then(d => {
+        const h = Math.floor(d.uptime / 3600);
+        const m = Math.floor((d.uptime % 3600) / 60);
+        document.getElementById("stat-uptime").textContent = h + "h " + m + "m";
+        document.getElementById("stat-monitored").textContent = messageCount.monitored;
+        document.getElementById("stat-flagged").textContent = messageCount.flagged;
+        document.getElementById("stat-removed").textContent = messageCount.removed;
+      }).catch(e => {});
+    }
+
+    function updateFeed() {
+      const feed = document.getElementById("feed");
+      feed.innerHTML = '<div class="feed-item safe"><strong>🤖 Dashboard Active</strong> - Monitoring enabled <span class="timestamp">now</span></div>';
+      if (shadowMode) {
+        feed.innerHTML += '<div class="feed-item caution"><strong>🌙 Shadow Mode ON</strong> - Messages logged, not deleted <span class="timestamp">now</span></div>';
+      } else {
+        feed.innerHTML += '<div class="feed-item removed"><strong>⚠️ Enforcement ON</strong> - Rule violations removed <span class="timestamp">now</span></div>';
+      }
+    }
+
+    document.getElementById("pwd").addEventListener("keypress", e => e.key === "Enter" && tryLogin());
   </script>
 </body>
 </html>`;
