@@ -150,10 +150,7 @@
       <button class="nav-item" onclick="switchTab('users')">
         <span class="icon">👥</span> Users
       </button>
-      <div class="nav-section">System</div>
-      <button class="nav-item" onclick="switchTab('backups')">
-        <span class="icon">💾</span> Backups
-      </button>
+      <div class="nav-section">Config</div>
       <button class="nav-item" onclick="switchTab('settings')">
         <span class="icon">⚙️</span> Settings
       </button>
@@ -235,37 +232,6 @@
       <div class="page-sub">Configure moderation for the selected server. Changes save immediately.</div>
       <div id="settings-content"><div class="empty">Select a server to configure</div></div>
     </div>
-
-    <!-- Backups Tab -->
-    <div id="tab-backups" style="display:none">
-      <div class="page-title">💾 Server Backups</div>
-      <div class="page-sub">Automatic daily backups at 2 AM PST • Trigger manual backups anytime</div>
-      <div class="settings-grid">
-        <div class="settings-card full">
-          <h3>🚀 Backup Controls</h3>
-          <div class="toggle-row">
-            <div>
-              <div class="label">Trigger Manual Backup</div>
-              <div class="desc">Creates a snapshot of server configuration, roles, and channels</div>
-            </div>
-            <button class="save-btn" onclick="triggerBackup()">📥 Backup Now</button>
-          </div>
-          <div class="toggle-row" style="border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px;">
-            <div>
-              <div class="label">Auto-Backup Schedule</div>
-              <div class="desc">Runs daily at 2 AM PST/PDT</div>
-            </div>
-            <div class="online-pill">✅ Enabled</div>
-          </div>
-        </div>
-        <div class="settings-card full">
-          <h3>📋 Backup History</h3>
-          <div id="backups-list" style="max-height: 400px; overflow-y: auto;">
-            <div class="empty">Loading backups...</div>
-          </div>
-        </div>
-      </div>
-    </div>
   </main>
 </div>
 
@@ -334,7 +300,6 @@ function switchTab(tab) {
   if (tab === 'feed')     renderFeed();
   if (tab === 'users')    loadUsers();
   if (tab === 'settings') loadSettings();
-  if (tab === 'backups')  loadBackups();
 }
 
 // ── Load status ──────────────────────────────────────────────────────────────
@@ -633,56 +598,6 @@ function startAutoRefresh() {
     loadStatus();
     loadFeed();
   }, 5000);
-}
-
-
-// ── Backups ──────────────────────────────────────────────────────────────────
-async function loadBackups() {
-  try {
-    const backups = await api('/api/backups');
-    renderBackups(backups);
-  } catch (err) {
-    document.getElementById('backups-list').innerHTML = '<div class="empty">Failed to load backups</div>';
-  }
-}
-
-function renderBackups(backups) {
-  const container = document.getElementById('backups-list');
-  if (!backups || backups.length === 0) {
-    container.innerHTML = '<div class="empty">No backups yet. Click "Backup Now" to create one.</div>';
-    return;
-  }
-  
-  container.innerHTML = backups.map(b => `
-    <div style="padding: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-      <div>
-        <div style="font-size: 13px; color: var(--text); font-weight: 500;">${b.name}</div>
-        <div style="font-size: 11px; color: var(--muted); margin-top: 3px;">${b.timestamp}</div>
-        <div style="font-size: 11px; color: var(--muted);">${b.size} KB</div>
-      </div>
-      <button class="btn" onclick="downloadBackup('${b.name}')">⬇️</button>
-    </div>
-  `).join('');
-}
-
-async function triggerBackup() {
-  try {
-    const btn = event.currentTarget;
-    btn.disabled = true;
-    btn.textContent = '⏳ Creating...';
-    await api('/api/backup-trigger', 'POST');
-    showToast('✅ Backup triggered! Check Discord to complete.', 'success');
-    await loadBackups();
-  } catch (err) {
-    showToast('❌ Backup failed', 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '📥 Backup Now';
-  }
-}
-
-function downloadBackup(filename) {
-  window.location.href = `/backups/${filename}`;
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────

@@ -458,6 +458,45 @@ app.post('/api/enforcement', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+app.get('/api/backups', (req, res) => {
+  try {
+    const files = fs.readdirSync(BACKUP_DIR) || [];
+    const backups = files.map(f => {
+      const fullPath = path.join(BACKUP_DIR, f);
+      const stat = fs.statSync(fullPath);
+      return {
+        name: f,
+        size: Math.round(stat.size / 1024), // KB
+        created: stat.birthtimeMs,
+        timestamp: new Date(stat.birthtimeMs).toLocaleString()
+      };
+    }).sort((a, b) => b.created - a.created);
+    res.json(backups);
+  } catch (err) {
+    res.json([]);
+  }
+});
+
+app.post('/api/backup-trigger', (req, res) => {
+  console.log('[Dashboard] Manual backup triggered');
+  res.json({ status: 'ok', message: 'Backup triggered. Check Discord with /backup command.' });
+});
+
+app.get('/backups/:filename', (req, res) => {
+  const filename = req.params.filename;
+  const filepath = path.join(BACKUP_DIR, filename);
+  
+  if (!filename.match(/^[\w\-\.]+$/)) {
+    return res.status(400).json({ error: 'Invalid filename' });
+  }
+  
+  if (!fs.existsSync(filepath)) {
+    return res.status(404).json({ error: 'Backup not found' });
+  }
+  
+  res.download(filepath);
+});
+
 // Serve index.html as default (dashboard will handle routing)
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'dashboard', 'index.html'));
