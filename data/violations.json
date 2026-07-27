@@ -9,6 +9,42 @@
           "category": "profanity",
           "content": "shit",
           "channelId": "1382935305337831445"
+        },
+        {
+          "ts": 1785194716566,
+          "verdict": "REMOVE",
+          "reason": "Contains profanity.",
+          "category": "profanity",
+          "content": "shit",
+          "channelId": "1382935305337831445",
+          "shadow": true
+        },
+        {
+          "ts": 1785194878775,
+          "verdict": "REMOVE",
+          "reason": "Contains profanity (masked swear word).",
+          "category": "profanity",
+          "content": "shity",
+          "channelId": "1382935305337831445",
+          "shadow": true
+        },
+        {
+          "ts": 1785194883207,
+          "verdict": "REMOVE",
+          "reason": "Contains profanity.",
+          "category": "profanity",
+          "content": "shit",
+          "channelId": "1382935305337831445",
+          "shadow": true
+        },
+        {
+          "ts": 1785195002358,
+          "verdict": "REMOVE",
+          "reason": "Contains profanity.",
+          "category": "profanity",
+          "content": "shit",
+          "channelId": "1382935305337831445",
+          "shadow": true
         }
       ],
       "targeting": {}

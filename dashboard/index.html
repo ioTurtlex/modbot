@@ -240,6 +240,7 @@
     <div id="tab-backups" style="display:none">
       <div class="page-title">💾 Server Backups</div>
       <div class="page-sub">Automatic daily backups at 2 AM PST • Trigger manual backups anytime</div>
+      <div id="backup-status"></div>
       <div class="settings-grid">
         <div class="settings-card full">
           <h3>🚀 Backup Controls</h3>
@@ -248,7 +249,7 @@
               <div class="label">Trigger Manual Backup</div>
               <div class="desc">Creates a snapshot of server configuration, roles, and channels</div>
             </div>
-            <button class="save-btn" onclick="triggerBackup()">📥 Backup Now</button>
+            <button class="save-btn" onclick="triggerBackup(this)">📥 Backup Now</button>
           </div>
           <div class="toggle-row" style="border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px;">
             <div>
@@ -498,6 +499,10 @@ function buildSettingsHTML(gcfg) {
         <label class="toggle"><input type="checkbox" id="cfg-enabled" ${gcfg.enabled !== false ? 'checked' : ''}><span class="toggle-slider"></span></label>
       </div>
       <div class="toggle-row">
+        <div><div class="label">👻 Shadow Mode</div><div class="desc">Analyze only — don't remove messages (test mode)</div></div>
+        <label class="toggle"><input type="checkbox" id="cfg-shadowMode" ${gcfg.shadowMode ? 'checked' : ''}><span class="toggle-slider"></span></label>
+      </div>
+      <div class="toggle-row">
         <div><div class="label">Profanity Filter</div><div class="desc">Block cuss words (church-appropriate)</div></div>
         <label class="toggle"><input type="checkbox" id="cfg-profanityFilter" ${gcfg.profanityFilter !== false ? 'checked' : ''}><span class="toggle-slider"></span></label>
       </div>
@@ -509,6 +514,10 @@ function buildSettingsHTML(gcfg) {
         <div><div class="label">Log Caution Messages</div><div class="desc">Send borderline messages to mod-log</div></div>
         <label class="toggle"><input type="checkbox" id="cfg-logCautionMessages" ${gcfg.logCautionMessages !== false ? 'checked' : ''}><span class="toggle-slider"></span></label>
       </div>
+      <div class="toggle-row">
+        <div><div class="label">💾 Automatic Backups</div><div class="desc">Daily backups at 2 AM PST</div></div>
+        <label class="toggle"><input type="checkbox" id="cfg-backupsEnabled" ${gcfg.backupsEnabled ? 'checked' : ''}><span class="toggle-slider"></span></label>
+      </div>
       <div class="form-group" style="margin-top:14px">
         <label>AI Sensitivity</label>
         <select id="cfg-sensitivity">
@@ -517,7 +526,7 @@ function buildSettingsHTML(gcfg) {
           <option value="high"   ${gcfg.sensitivity==='high'   ? 'selected' : ''}>High — strict community standards</option>
         </select>
       </div>
-      <button class="save-btn" onclick="saveCfg(['enabled','profanityFilter','dmWarnings','logCautionMessages','sensitivity'])">Save</button>
+      <button class="save-btn" onclick="saveCfg(['enabled','shadowMode','profanityFilter','dmWarnings','logCautionMessages','sensitivity','backupsEnabled'])">Save</button>
     </div>
 
     <!-- Channel & Role Settings -->
@@ -639,11 +648,37 @@ function startAutoRefresh() {
 // ── Backups ──────────────────────────────────────────────────────────────────
 async function loadBackups() {
   try {
-    const backups = await api('/api/backups');
+    const [backups, status] = await Promise.all([
+      api('/api/backups'),
+      api('/api/backup-status')
+    ]);
+    renderBackupStatus(status);
     renderBackups(backups);
   } catch (err) {
     document.getElementById('backups-list').innerHTML = '<div class="empty">Failed to load backups</div>';
   }
+}
+
+function renderBackupStatus(status) {
+  const statusDiv = document.getElementById('backup-status');
+  if (!statusDiv) return;
+  
+  const statusColor = status.isRunning ? '#f59e0b' : (status.status === 'complete' ? '#22c55e' : '#8b949e');
+  const statusText = status.isRunning ? '⏳ Running...' : (status.status === 'complete' ? '✅ Idle' : '⚫ ' + status.status);
+  
+  statusDiv.innerHTML = `
+    <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <div style="font-weight: 600; color: ${statusColor};">${statusText}</div>
+        <button class="btn" style="font-size: 11px; padding: 4px 8px;" onclick="loadBackups()">🔄 Refresh</button>
+      </div>
+      <div style="font-size: 11px; color: var(--muted); line-height: 1.6;">
+        <div>Last backup: ${status.lastBackupTime}</div>
+        <div>Next scheduled: ${status.nextBackupTime}</div>
+        <div>Total backups: ${status.totalBackups}</div>
+      </div>
+    </div>
+  `;
 }
 
 function renderBackups(backups) {
@@ -665,16 +700,33 @@ function renderBackups(backups) {
   `).join('');
 }
 
-async function triggerBackup() {
+async function triggerBackup(btn) {
   try {
-    const btn = event.currentTarget;
     btn.disabled = true;
     btn.textContent = '⏳ Creating...';
-    await api('/api/backup-trigger', 'POST');
-    showToast('✅ Backup triggered! Check Discord to complete.', 'success');
-    await loadBackups();
+    
+    const result = await api('/api/backup-trigger', { method: 'POST' });
+    
+    if (result.status === 'already-running') {
+      toast('⏳ Backup already running. Please wait...', '#f59e0b');
+      // Still poll while running
+      const pollInterval = setInterval(async () => {
+        const status = await api('/api/backup-status');
+        if (!status.isRunning) {
+          clearInterval(pollInterval);
+          await loadBackups();
+          toast('✅ Backup complete!', '#22c55e');
+        }
+      }, 2000);
+    } else if (result.status === 'complete') {
+      toast(`✅ ${result.message}`, '#22c55e');
+      await loadBackups();
+    } else {
+      toast(result.message, '#22c55e');
+    }
+    
   } catch (err) {
-    showToast('❌ Backup failed', 'error');
+    toast('❌ Backup failed: ' + err.message, '#ef4444');
   } finally {
     btn.disabled = false;
     btn.textContent = '📥 Backup Now';

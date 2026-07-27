@@ -1,1 +1,1 @@
-web: npm install && node modbot-combined.js
+web: npm install && node modbot.js

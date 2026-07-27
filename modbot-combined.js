@@ -30,6 +30,24 @@ const DELETION_LOG_DIR = path.join(DATA_DIR, 'deletion-logs');
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
 
+// Backup status tracking
+let backupStatus = {
+  lastBackupTime: null,
+  lastBackupStatus: 'idle',
+  nextBackupTime: null,
+  totalBackups: 0,
+  isRunning: false,
+  details: {}  // { guildId: { status, size, timestamp, count } }
+};
+
+function updateBackupStatus(status, details = {}) {
+  backupStatus.lastBackupStatus = status;
+  if (status === 'running') backupStatus.isRunning = true;
+  else if (status === 'complete' || status === 'failed') backupStatus.isRunning = false;
+  Object.assign(backupStatus.details, details);
+  console.log(`[Backup Status] ${status}`, details);
+}
+
 // Slash commands
 const commands = [
   { name: 'modbot', description: 'Moderation bot controls' },
@@ -72,8 +90,6 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildEmojisAndStickers,
   ]
 });
 
@@ -115,7 +131,8 @@ const GUILD_DEFAULTS = {
   enabled: true,
   sensitivity: 'medium',
   targetIds: [],
-  modLogChannel: null
+  modLogChannel: null,
+  backupsEnabled: false  // Disabled by default, user can enable in settings
 };
 
 function getConfigPath(guildId) {
@@ -290,20 +307,30 @@ client.on('interactionCreate', async inter => {
 async function fetchAllMessages(channel, max = 1000) {
   let allMessages = [];
   let lastId = undefined;
+  let fetched = 0;
   while (allMessages.length < max) {
     const options = { limit: 100 };
     if (lastId) options.before = lastId;
-    let messages = await channel.messages.fetch(options);
-    if (!messages.size) break;
-    allMessages = allMessages.concat(Array.from(messages.values()));
-    lastId = messages.last().id;
-    if (messages.size < 100) break;
-    await delay(400);
+    try {
+      let messages = await channel.messages.fetch(options);
+      if (!messages.size) break;
+      allMessages = allMessages.concat(Array.from(messages.values()));
+      fetched += messages.size;
+      lastId = messages.last().id;
+      if (messages.size < 100) break;
+      await delay(200);  // Reduced from 400ms
+    } catch (e) {
+      console.warn(`  ⚠️ Could not fetch messages from ${channel.name}: ${e.message}`);
+      break;
+    }
   }
   return allMessages.reverse().slice(0, max);
 }
 
 async function performBackup(guild) {
+  console.log(`[Backup] ⏳ Starting backup for "${guild.name}"...`);
+  updateBackupStatus('running', { [guild.id]: { status: 'processing', guild: guild.name } });
+  
   let backup = { guild: {}, roles: [], categories: [], channels: [], nicknames: {}, emojis: [], webhooks: [] };
 
   backup.guild = {
@@ -341,6 +368,7 @@ async function performBackup(guild) {
         })),
       });
     } else {
+      console.log(`  📝 Backing up #${channel.name}...`);
       let channelData = {
         id: channel.id,
         name: channel.name,
@@ -353,7 +381,7 @@ async function performBackup(guild) {
       };
 
       try {
-        let messages = await fetchAllMessages(channel, 1000);
+        let messages = await fetchAllMessages(channel, 500);  // Reduced from 1000
         channelData.messages = messages
           .filter(m => !!m)
           .map(m => ({
@@ -369,17 +397,27 @@ async function performBackup(guild) {
             })),
             embeds: m.embeds,
           }));
-      } catch (e) {}
+        console.log(`    ✓ ${channelData.messages.length} messages`);
+      } catch (e) {
+        console.warn(`    ✗ Error backing up: ${e.message}`);
+      }
 
       backup.channels.push(channelData);
     }
   }
 
-  await guild.members.fetch();
-  guild.members.cache.forEach(member => {
-    if (member.nickname) backup.nicknames[member.id] = member.nickname;
-  });
+  console.log(`  👥 Fetching members...`);
+  try {
+    await guild.members.fetch();
+    guild.members.cache.forEach(member => {
+      if (member.nickname) backup.nicknames[member.id] = member.nickname;
+    });
+    console.log(`    ✓ ${Object.keys(backup.nicknames).length} members with nicknames`);
+  } catch (e) {
+    console.warn(`    ✗ Could not fetch members: ${e.message}`);
+  }
 
+  console.log(`  😊 Collecting emojis...`);
   for (const [, emoji] of guild.emojis.cache) {
     backup.emojis.push({
       name: emoji.name,
@@ -388,6 +426,7 @@ async function performBackup(guild) {
       animated: emoji.animated,
     });
   }
+  if (backup.emojis.length) console.log(`    ✓ ${backup.emojis.length} emojis`);
 
   const timestamp = Date.now();
   const fileBase = `${guild.id}-${timestamp}`;
@@ -395,8 +434,18 @@ async function performBackup(guild) {
   if (backupFiles.length >= 5) {
     fs.unlinkSync(path.join(BACKUP_DIR, backupFiles.sort()[0]));
   }
+  console.log(`  💾 Writing backup file...`);
   const backupFilePath = path.join(BACKUP_DIR, `${fileBase}.json`);
-  fs.writeFileSync(backupFilePath, JSON.stringify(backup, null, 2));
+  const backupContent = JSON.stringify(backup, null, 2);
+  fs.writeFileSync(backupFilePath, backupContent);
+  
+  const sizeKB = Math.round(backupContent.length / 1024);
+  console.log(`✅ Backup complete: "${guild.name}" (${sizeKB} KB)`);
+  updateBackupStatus('complete', { 
+    [guild.id]: { status: 'success', guild: guild.name, size: sizeKB, timestamp, messageCount: backup.channels.reduce((sum, ch) => sum + ch.messages.length, 0) } 
+  });
+  backupStatus.lastBackupTime = timestamp;
+  backupStatus.totalBackups++;
 }
 
 function scheduleAutomaticBackups() {
@@ -407,19 +456,29 @@ function scheduleAutomaticBackups() {
     target.setDate(target.getDate() + 1);
   }
   const delayMs = target.getTime() - now.getTime();
-  console.log(`Next automatic backup in ${Math.round(delayMs / 1000 / 60)} minutes`);
+  const delayMinutes = Math.round(delayMs / 1000 / 60);
+  backupStatus.nextBackupTime = target;
+  console.log(`⏰ Next automatic backup scheduled: ${target.toLocaleString()} (in ${delayMinutes} minutes)`);
   
   setTimeout(async () => {
-    console.log('Running automatic backups...');
+    console.log('\n🔄 AUTOMATIC BACKUP CYCLE STARTED');
+    updateBackupStatus('running', { general: 'Starting automatic backup cycle' });
+    let successCount = 0, failCount = 0;
+    
     for (const guild of client.guilds.cache.values()) {
       try {
         await performBackup(guild);
-        console.log(`✅ Backup: ${guild.name}`);
+        successCount++;
       } catch (e) {
-        console.error(`Backup failed: ${guild.name}`, e.message);
+        console.error(`❌ Backup failed for "${guild.name}":`, e.message);
+        updateBackupStatus('failed', { [guild.id]: { status: 'failed', error: e.message } });
+        failCount++;
       }
       await delay(2000);
     }
+    
+    console.log(`\n✅ Automatic backup cycle complete: ${successCount} succeeded, ${failCount} failed\n`);
+    updateBackupStatus('idle', { summary: `${successCount} ok, ${failCount} failed` });
     scheduleAutomaticBackups();
   }, delayMs);
 }
@@ -546,9 +605,45 @@ app.get('/api/backups', (req, res) => {
   }
 });
 
-app.post('/api/backup-trigger', (req, res) => {
+app.post('/api/backup-trigger', async (req, res) => {
   console.log('[Dashboard] Manual backup triggered');
-  res.json({ status: 'ok', message: 'Backup triggered. Check Discord with /backup command.' });
+  
+  if (backupStatus.isRunning) {
+    return res.json({ status: 'already-running', message: 'Backup is already running. Please wait...' });
+  }
+  
+  updateBackupStatus('running', { manual: 'Dashboard triggered backup' });
+  let results = { success: 0, failed: 0, errors: [] };
+  
+  try {
+    for (const guild of client.guilds.cache.values()) {
+      try {
+        await performBackup(guild);
+        results.success++;
+      } catch (e) {
+        results.failed++;
+        results.errors.push(`${guild.name}: ${e.message}`);
+        console.error(`Backup failed for ${guild.name}:`, e.message);
+      }
+      await delay(1000);
+    }
+    updateBackupStatus('complete', { manual: 'Dashboard backup finished' });
+    res.json({ status: 'complete', ...results, message: `✅ Backup complete: ${results.success} succeeded${results.failed ? `, ${results.failed} failed` : ''}` });
+  } catch (e) {
+    updateBackupStatus('failed', { error: e.message });
+    res.status(500).json({ status: 'error', message: e.message });
+  }
+});
+
+app.get('/api/backup-status', (req, res) => {
+  res.json({
+    status: backupStatus.lastBackupStatus,
+    isRunning: backupStatus.isRunning,
+    lastBackupTime: backupStatus.lastBackupTime ? new Date(backupStatus.lastBackupTime).toLocaleString() : 'Never',
+    nextBackupTime: backupStatus.nextBackupTime ? backupStatus.nextBackupTime.toLocaleString() : 'Calculating...',
+    totalBackups: backupStatus.totalBackups,
+    details: backupStatus.details
+  });
 });
 
 app.get('/backups/:filename', (req, res) => {

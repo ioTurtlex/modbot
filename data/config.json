@@ -1,0 +1,123 @@
+{
+  "1368656423608782981": {
+    "enabled": true,
+    "shadowMode": false,
+    "sensitivity": "medium",
+    "monitorAllChannels": true,
+    "monitorChannels": [],
+    "ignoreChannels": [
+      "mod-log",
+      "bot-log",
+      "staff",
+      "admin"
+    ],
+    "exemptRoles": [
+      "Moderator",
+      "Admin",
+      "Staff"
+    ],
+    "modLogChannel": "mod-log",
+    "modRoleName": "Moderator",
+    "strikePingAt": 2,
+    "strikeDecayDays": 30,
+    "dmWarnings": true,
+    "logCautionMessages": true,
+    "targetingWindowHours": 24,
+    "targetingEscalateAt": 3,
+    "timeouts": {
+      "2": 10,
+      "3": 60,
+      "4": 1440
+    },
+    "communityContext": "This is a Christian family-friendly community server for followers of Lexi Carroll, a faith-based livestreamer. The community is welcoming, faith-centered, and upholds Christian values.",
+    "vipPersonDescription": "Lexi Carroll is the community leader and livestreamer. She is a young woman who is the founder and heart of this community. Any sexual comments, romantic fixation, obsessive appearance comments, or inappropriate targeting directed at her — even if subtle — should be flagged as CAUTION or REMOVE immediately.",
+    "vipNames": [
+      "lexi",
+      "lexi carroll"
+    ],
+    "serverType": "christian",
+    "dashboardPort": 3006,
+    "dashboardPassword": "",
+    "profanityFilter": true
+  },
+  "1380005614989738084": {
+    "enabled": true,
+    "shadowMode": true,
+    "sensitivity": "medium",
+    "monitorAllChannels": true,
+    "monitorChannels": [],
+    "ignoreChannels": [
+      "mod-log",
+      "bot-log",
+      "staff",
+      "admin"
+    ],
+    "exemptRoles": [
+      "Moderator",
+      "Admin",
+      "Staff"
+    ],
+    "modLogChannel": "mod-log",
+    "modRoleName": "Moderator",
+    "strikePingAt": 2,
+    "strikeDecayDays": 30,
+    "dmWarnings": true,
+    "logCautionMessages": true,
+    "targetingWindowHours": 24,
+    "targetingEscalateAt": 3,
+    "timeouts": {
+      "2": 10,
+      "3": 60,
+      "4": 1440
+    },
+    "communityContext": "This is a Christian family-friendly community server for followers of Lexi Carroll, a faith-based livestreamer. The community is welcoming, faith-centered, and upholds Christian values.",
+    "vipPersonDescription": "Lexi Carroll is the community leader and livestreamer. She is a young woman who is the founder and heart of this community. Any sexual comments, romantic fixation, obsessive appearance comments, or inappropriate targeting directed at her — even if subtle — should be flagged as CAUTION or REMOVE immediately.",
+    "vipNames": [
+      "lexi",
+      "lexi carroll"
+    ],
+    "serverType": "christian",
+    "dashboardPort": 3006,
+    "dashboardPassword": ""
+  },
+  "1382868571071185120": {
+    "enabled": true,
+    "shadowMode": true,
+    "sensitivity": "medium",
+    "monitorAllChannels": true,
+    "monitorChannels": [],
+    "ignoreChannels": [
+      "mod-log",
+      "bot-log",
+      "staff",
+      "admin"
+    ],
+    "exemptRoles": [
+      "Moderator",
+      "Admin",
+      "Staff"
+    ],
+    "modLogChannel": "mod-log",
+    "modRoleName": "Moderator",
+    "strikePingAt": 2,
+    "strikeDecayDays": 30,
+    "dmWarnings": true,
+    "logCautionMessages": true,
+    "targetingWindowHours": 24,
+    "targetingEscalateAt": 3,
+    "timeouts": {
+      "2": 10,
+      "3": 60,
+      "4": 1440
+    },
+    "communityContext": "This is a Christian family-friendly community server for followers of Lexi Carroll, a faith-based livestreamer. The community is welcoming, faith-centered, and upholds Christian values.",
+    "vipPersonDescription": "Lexi Carroll is the community leader and livestreamer. She is a young woman who is the founder and heart of this community. Any sexual comments, romantic fixation, obsessive appearance comments, or inappropriate targeting directed at her — even if subtle — should be flagged as CAUTION or REMOVE immediately.",
+    "vipNames": [
+      "lexi",
+      "lexi carroll"
+    ],
+    "serverType": "christian",
+    "dashboardPort": 3006,
+    "dashboardPassword": ""
+  }
+}
