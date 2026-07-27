@@ -61,11 +61,10 @@ console.log(
   `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&scope=bot+applications.commands&permissions=${BOT_PERMS}`
   );
   console.log(`\n✅ This bot does TWO things:`);
-  console.log(`   1. Real-time moderation (delete rule violations)`);
-  console.log(`   2. Automatic daily server backups at 2 AM PST/PDT`);
-  console.log(`\n✅ Permissions: Send Messages + Manage Messages + Read History only`);
-  console.log(`===============================================\n`);
-})();
+console.log(`   1. Real-time moderation (delete rule violations)`);
+console.log(`   2. Automatic daily server backups at 2 AM PST/PDT`);
+console.log(`\n✅ Permissions: Send Messages + Manage Messages + Read History only`);
+console.log(`===============================================\n`);
 
 const client = new Client({
   intents: [
