@@ -218,9 +218,10 @@ client.on('messageCreate', async message => {
 
   const analysis = await gptAnalyze(message, config.sensitivity);
 
-  if (analysis.verdict === 'REMOVE') {
-    await logDeletion(guild.id, message, analysis.category, 'REMOVE', analysis.category);
+  // Log ALL messages (safe, caution, and remove)
+  await logDeletion(guild.id, message, analysis.category, analysis.verdict, analysis.category);
 
+  if (analysis.verdict === 'REMOVE') {
     if (!config.shadowMode) {
       await message.delete().catch(() => {});
       await message.author.send(`⚠️ Your message in **${guild.name}** was removed.\nReason: ${analysis.category}`).catch(() => {});
@@ -231,7 +232,6 @@ client.on('messageCreate', async message => {
       modLog.send(`🚫 **REMOVED**: ${message.author.username} - ${analysis.category}\n\`\`\`${message.content.substring(0, 100)}\`\`\``);
     }
   } else if (analysis.verdict === 'CAUTION') {
-    await logDeletion(guild.id, message, analysis.category, 'CAUTION', analysis.category);
     const modLog = guild.channels.cache.get(config.modLogChannel);
     if (modLog) {
       modLog.send(`⚠️ **CAUTION**: ${message.author.username} - ${analysis.category}`);
@@ -430,7 +430,39 @@ app.use(express.static(path.join(__dirname, 'dashboard')));
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/status', (req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime() });
+  const today = new Date().toDateString();
+  let analyzed = 0, caution = 0, removed = 0;
+  
+  // Count messages processed today
+  client.guilds.cache.forEach(guild => {
+    const logFile = path.join(DELETION_LOG_DIR, `deletion-log-${guild.id}.jsonl`);
+    if (fs.existsSync(logFile)) {
+      const lines = fs.readFileSync(logFile, 'utf8').split('\n').filter(l => l);
+      lines.forEach(line => {
+        try {
+          const entry = JSON.parse(line);
+          if (new Date(entry.timestamp).toDateString() === today) {
+            analyzed++;
+            if (entry.verdict === 'CAUTION') caution++;
+            if (entry.verdict === 'REMOVE') removed++;
+          }
+        } catch (e) {}
+      });
+    }
+  });
+  
+  res.json({
+    status: 'online',
+    botTag: `${client.user.username}#${client.user.discriminator}`,
+    uptime: Math.floor(process.uptime()),
+    model: 'gpt-4o-mini',
+    today: { analyzed, caution, removed },
+    guilds: Array.from(client.guilds.cache.values()).map(g => ({
+      id: g.id,
+      name: g.name,
+      icon: g.iconURL()
+    }))
+  });
 });
 
 app.get('/api/deletions/:guildId', (req, res) => {
@@ -445,6 +477,42 @@ app.get('/api/deletions/:guildId', (req, res) => {
   const lines = fs.readFileSync(logFile, 'utf8').split('\n').filter(l => l);
   const deletions = lines.map(l => JSON.parse(l)).reverse().slice(0, parseInt(limit));
   res.json(deletions);
+});
+
+app.get('/api/feed', (req, res) => {
+  const { limit = 200 } = req.query;
+  const allEntries = [];
+  
+  // Read deletion logs from all guilds
+  client.guilds.cache.forEach(guild => {
+    const logFile = path.join(DELETION_LOG_DIR, `deletion-log-${guild.id}.jsonl`);
+    
+    if (fs.existsSync(logFile)) {
+      const lines = fs.readFileSync(logFile, 'utf8').split('\n').filter(l => l);
+      const entries = lines.map(l => {
+        try {
+          const entry = JSON.parse(l);
+          return {
+            ...entry,
+            guildName: guild.name,
+            channelName: entry.channel,
+            severity: entry.verdict === 'REMOVE' ? 4 : entry.verdict === 'CAUTION' ? 2 : 0,
+            reason: entry.category
+          };
+        } catch (e) {
+          return null;
+        }
+      }).filter(e => e);
+      allEntries.push(...entries);
+    }
+  });
+  
+  // Sort by timestamp (newest first) and limit
+  const sorted = allEntries.sort((a, b) => 
+    new Date(b.timestamp) - new Date(a.timestamp)
+  ).slice(0, parseInt(limit));
+  
+  res.json(sorted);
 });
 
 app.post('/api/shadow-mode', (req, res) => {
