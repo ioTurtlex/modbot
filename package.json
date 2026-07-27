@@ -7,6 +7,7 @@
     "start": "node modbot-combined.js"
   },
   "dependencies": {
+    "axios": "^1.7.7",
     "discord.js": "^14.19.3",
     "dotenv": "^16.5.0",
     "express": "^4.22.2",
