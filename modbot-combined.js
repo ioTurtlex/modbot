@@ -39,15 +39,26 @@ const commands = [
 // Permissions: Send Messages (4096) + Manage Messages (8192) + Read Message History (65536) = 77824
 const BOT_PERMS = 77824;
 
-const rest = new REST({ version: '10' }).setToken(TOKEN);
-(async () => {
-  await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
-  console.log('Bot slash commands registered.');
-  console.log('\n===============================================');
-  console.log(`${BOT_NAME} Ready!`);
-  console.log('\nBOT INVITE (Moderation + Backup permissions):');
-  console.log(
-    `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&scope=bot+applications.commands&permissions=${BOT_PERMS}`
+// Register commands only if TOKEN is available
+if (TOKEN) {
+  const rest = new REST({ version: '10' }).setToken(TOKEN);
+  (async () => {
+    try {
+      await rest.put(Routes.applicationCommands(CLIENT_ID), { body: commands });
+      console.log('Bot slash commands registered.');
+    } catch (err) {
+      console.error('Failed to register commands:', err.message);
+    }
+  })();
+} else {
+  console.warn('⚠️ DISCORD_TOKEN not set. Skipping command registration.');
+}
+
+console.log('\n===============================================');
+console.log(`${BOT_NAME} Ready!`);
+console.log('\nBOT INVITE (Moderation + Backup permissions):');
+console.log(
+  `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&scope=bot+applications.commands&permissions=${BOT_PERMS}`
   );
   console.log(`\n✅ This bot does TWO things:`);
   console.log(`   1. Real-time moderation (delete rule violations)`);
@@ -515,4 +526,10 @@ app.get('/', (req, res) => {
 const PORT = process.env.PORT || 3006;
 app.listen(PORT, () => console.log(`Dashboard running on port ${PORT}`));
 
-client.login(TOKEN);
+if (TOKEN) {
+  client.login(TOKEN);
+} else {
+  console.error('❌ DISCORD_TOKEN environment variable is not set!');
+  console.error('Please set DISCORD_TOKEN in your environment or .env file.');
+  process.exit(1);
+}
