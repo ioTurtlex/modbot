@@ -1047,7 +1047,7 @@ dashApp.get('/api/users', (req, res) => {
   res.json(users);
 });
 
-const DASHBOARD_PORT = parseInt(process.env.DASHBOARD_PORT) || 3006;
+const DASHBOARD_PORT = parseInt(process.env.PORT) || parseInt(process.env.DASHBOARD_PORT) || 3006;
 dashApp.listen(DASHBOARD_PORT, '0.0.0.0', () => {
   console.log(`🎛️  Jelly Labs Studio: http://localhost:${DASHBOARD_PORT}`);
 });
