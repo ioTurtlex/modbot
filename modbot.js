@@ -491,8 +491,7 @@ async function handleAction(msg, guildId, verdict, severity, reason, category, m
   const newStrikes = getActiveStrikes(guildId, uid); // re-read after adding violation
   const color  = verdict === 'REMOVE' ? (newStrikes >= 3 ? 0xDD0000 : 0xFF4444) : 0xFFAA00;
   const icon   = verdict === 'REMOVE' ? '🚫' : '⚠️';
-  const title  = verdict === 'REMOVE' ? `🚫 Message Removed` : `⚠️ Flagged`
-    : `${icon} ${verdict === 'REMOVE' ? `Message Removed (Strike ${newStrikes})` : 'Message Flagged for Review'}`;
+  const title  = verdict === 'REMOVE' ? `🚫 Message Removed` : `⚠️ Flagged`;
   const embed  = new EmbedBuilder()
     .setColor(color)
     .setTitle(title)
