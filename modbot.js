@@ -146,7 +146,7 @@ function checkDeletionRateLimit(guildId) {
 // Default config per guild
 const GUILD_DEFAULTS = {
   enabled:            true,
-  shadowMode:         true,        // 👻 analyze + log ONLY — no deletes, timeouts, or DMs. Turn off after reviewing real traffic.
+  shadowMode:         false,       // 👻 analyze + log ONLY — no deletes, timeouts, or DMs. Turn ON for testing.
   sensitivity:        'medium',    // 'low' | 'medium' | 'high'
   monitorAllChannels: true,
   monitorChannels:    [],
