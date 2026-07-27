@@ -13,7 +13,7 @@ const OpenAI = require('openai').default;
 const TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const DASHBOARD_PASSWORD = process.env.DASHBOARD_PASSWORD || 'defaultpassword';
-const MOD_MODEL = process.env.MOD_MODEL || 'gpt-4o-mini';  // Override via .env: MOD_MODEL=gpt-4o
+const MOD_MODEL = process.env.MOD_MODEL || 'gpt-5.4-mini';  // Keep your model!
 const OWNER_ID = process.env.OWNER_ID;
 const BOT_NAME = process.env.BOT_NAME || 'Jelly Guardian';
 
