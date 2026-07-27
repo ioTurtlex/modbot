@@ -146,7 +146,6 @@ function checkDeletionRateLimit(guildId) {
 // Default config per guild
 const GUILD_DEFAULTS = {
   enabled:            true,
-  shadowMode:         false,       // 👻 analyze + log ONLY — no deletes, timeouts, or DMs. Turn ON for testing.
   sensitivity:        'medium',    // 'low' | 'medium' | 'high'
   monitorAllChannels: true,
   monitorChannels:    [],
@@ -195,15 +194,15 @@ function getUserRecord(guildId, userId) {
   return userRecords[guildId][userId];
 }
 
-// Count active (non-decayed) strikes for a user — shadow-mode violations don't count
+// Count active (non-decayed) strikes for a user
 function getActiveStrikes(guildId, userId) {
   const g      = getGuildCfg(guildId);
   const record = getUserRecord(guildId, userId);
   const cutoff = Date.now() - g.strikeDecayDays * 86400000;
-  return record.violations.filter(v => v.ts > cutoff && v.verdict === 'REMOVE' && !v.shadow).length;
+  return record.violations.filter(v => v.ts > cutoff && v.verdict === 'REMOVE').length;
 }
 
-function addViolation(guildId, userId, verdict, reason, category, content, channelId, shadow = false) {
+function addViolation(guildId, userId, verdict, reason, category, content, channelId) {
   const record = getUserRecord(guildId, userId);
   record.violations.push({
     ts: Date.now(),
@@ -212,7 +211,6 @@ function addViolation(guildId, userId, verdict, reason, category, content, chann
     category,
     content: content.slice(0, 400),
     channelId,
-    ...(shadow ? { shadow: true } : {}),
   });
   // Keep last 200 violations per user
   if (record.violations.length > 200) record.violations.shift();
@@ -438,21 +436,16 @@ async function handleAction(msg, guildId, verdict, severity, reason, category, m
   const uid    = msg.author.id;
   const gcfg   = getGuildCfg(guildId);
   const guild  = msg.guild;
-  const shadow = !!gcfg.shadowMode;
   const strikes = getActiveStrikes(guildId, uid);
 
-  // Log the violation (shadow violations don't count toward strikes)
-  addViolation(guildId, uid, verdict, reason, category, msg.content, msg.channel.id, shadow);
+  // Log the violation
+  addViolation(guildId, uid, verdict, reason, category, msg.content, msg.channel.id);
 
   const actionsTaken = [];
   let timeoutMinutes = 0;
   let deleted = false;
 
-  if (verdict === 'REMOVE' && shadow) {
-    // 👻 Shadow mode: log what WOULD have happened, take no action
-    actionsTaken.push('👻 shadow — would have deleted');
-    console.log(`[modbot] 👻 SHADOW: would delete "${msg.content.slice(0, 60)}" (${category})`);
-  } else if (verdict === 'REMOVE') {
+  if (verdict === 'REMOVE') {
     // Delete message (with logging and rate limiting)
     
     // Check rate limiter to prevent cascade deletes
@@ -496,10 +489,9 @@ async function handleAction(msg, guildId, verdict, severity, reason, category, m
 
   // Build mod log embed
   const newStrikes = getActiveStrikes(guildId, uid); // re-read after adding violation
-  const color  = shadow ? 0x8888FF : verdict === 'REMOVE' ? (newStrikes >= 3 ? 0xDD0000 : 0xFF4444) : 0xFFAA00;
-  const icon   = shadow ? '👻' : verdict === 'REMOVE' ? '🚫' : '⚠️';
-  const title  = shadow
-    ? `👻 [SHADOW] Would ${verdict === 'REMOVE' ? 'remove' : 'flag'} — no action taken`
+  const color  = verdict === 'REMOVE' ? (newStrikes >= 3 ? 0xDD0000 : 0xFF4444) : 0xFFAA00;
+  const icon   = verdict === 'REMOVE' ? '🚫' : '⚠️';
+  const title  = verdict === 'REMOVE' ? `🚫 Message Removed` : `⚠️ Flagged`
     : `${icon} ${verdict === 'REMOVE' ? `Message Removed (Strike ${newStrikes})` : 'Message Flagged for Review'}`;
   const embed  = new EmbedBuilder()
     .setColor(color)
@@ -519,8 +511,8 @@ async function handleAction(msg, guildId, verdict, severity, reason, category, m
   if (mentionedIds.length)
     embed.addFields({ name: 'Targeted User(s)', value: mentionedIds.map(id => `<@${id}>`).join(', '), inline: false });
 
-  // Ping mod role if strike count is at/above threshold (never ping in shadow mode)
-  const shouldPing = !shadow && verdict === 'REMOVE' && newStrikes >= gcfg.strikePingAt;
+  // Ping mod role if strike count is at/above threshold
+  const shouldPing = verdict === 'REMOVE' && newStrikes >= gcfg.strikePingAt;
   await sendModLog(guild, guildId, embed, shouldPing);
 
   return deleted;
@@ -585,8 +577,7 @@ async function moderateMessage(msg) {
     username:    msg.author.username,
     content:     msg.content.slice(0, 300),
     verdict, severity, reason, category,
-    shadow:      !!gcfg.shadowMode,
-    action:      gcfg.shadowMode && verdict !== 'SAFE' ? '👻 shadow (no action)' : 'pending',
+    action:      'pending',
   });
 
   if (verdict === 'SAFE') return;
@@ -805,7 +796,6 @@ client.on('interactionCreate', async inter => {
       return inter.editReply([
         `**🛡️ ModBot Status — ${inter.guild.name}**`,
         `Enabled: ${gcfg.enabled ? '✅' : '❌'}`,
-        `Shadow mode: ${gcfg.shadowMode ? '👻 ON (log-only, no enforcement)' : 'OFF (full enforcement)'}`,
         `Sensitivity: **${gcfg.sensitivity}**`,
         `Coverage: ${gcfg.monitorAllChannels ? 'All channels' : `Specific: ${gcfg.monitorChannels.join(', ') || 'none'}`}`,
         `Ignored channels: ${gcfg.ignoreChannels.join(', ') || 'none'}`,
@@ -885,15 +875,7 @@ client.on('interactionCreate', async inter => {
       saveCfg();
       return inter.editReply(`🛡️ Moderation **${gcfg.enabled ? 'enabled' : 'disabled'}**.`);
     }
-    // ── shadow ────────────────────────────────────────────────────────────────────
-    if (sub === 'shadow') {
-      gcfg.shadowMode = inter.options.getBoolean('enabled');
-      saveCfg();
-      return inter.editReply(gcfg.shadowMode
-        ? '👻 Shadow mode **ON** — analyzing and logging only, no deletes/timeouts/DMs.'
-        : '🛡️ Shadow mode **OFF** — full enforcement active.');
-    }
-    // ── logchannel ────────────────────────────────────────────────────────────
+    // ── logchannel ────────────────────────────────────────────────────────────────────
     if (sub === 'logchannel') {
       gcfg.modLogChannel = inter.options.getString('name');
       saveCfg();

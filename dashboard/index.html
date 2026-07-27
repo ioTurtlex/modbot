@@ -499,10 +499,6 @@ function buildSettingsHTML(gcfg) {
         <label class="toggle"><input type="checkbox" id="cfg-enabled" ${gcfg.enabled !== false ? 'checked' : ''}><span class="toggle-slider"></span></label>
       </div>
       <div class="toggle-row">
-        <div><div class="label">👻 Shadow Mode</div><div class="desc">Analyze only — don't remove messages (test mode)</div></div>
-        <label class="toggle"><input type="checkbox" id="cfg-shadowMode" ${gcfg.shadowMode ? 'checked' : ''}><span class="toggle-slider"></span></label>
-      </div>
-      <div class="toggle-row">
         <div><div class="label">Profanity Filter</div><div class="desc">Block cuss words (church-appropriate)</div></div>
         <label class="toggle"><input type="checkbox" id="cfg-profanityFilter" ${gcfg.profanityFilter !== false ? 'checked' : ''}><span class="toggle-slider"></span></label>
       </div>
@@ -526,7 +522,7 @@ function buildSettingsHTML(gcfg) {
           <option value="high"   ${gcfg.sensitivity==='high'   ? 'selected' : ''}>High — strict community standards</option>
         </select>
       </div>
-      <button class="save-btn" onclick="saveCfg(['enabled','shadowMode','profanityFilter','dmWarnings','logCautionMessages','sensitivity','backupsEnabled'])">Save</button>
+      <button class="save-btn" onclick="saveCfg(['enabled','profanityFilter','dmWarnings','logCautionMessages','sensitivity'])">Save</button>
     </div>
 
     <!-- Channel & Role Settings -->
