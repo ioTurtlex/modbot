@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🪼 Jelly Labs Studio</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:        #0d1117;
+    --surface:   #161b22;
+    --card:      #1c2128;
+    --border:    #30363d;
+    --text:      #e6edf3;
+    --muted:     #8b949e;
+    --accent:    #7c3aed;
+    --accent2:   #0ea5e9;
+    --safe:      #22c55e;
+    --caution:   #f59e0b;
+    --remove:    #ef4444;
+    --warn:      #f97316;
+  }
+  html, body { height: 100%; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; }
+
+  /* Layout */
+  .layout { display: flex; height: 100vh; }
+  .sidebar { width: 220px; min-width: 220px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 0; }
+  .main    { flex: 1; overflow-y: auto; padding: 28px; }
+
+  /* Sidebar */
+  .logo { padding: 20px 16px 16px; border-bottom: 1px solid var(--border); }
+  .logo h1 { font-size: 15px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 8px; }
+  .logo .subtitle { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--safe); display: inline-block; }
+  .status-dot.offline { background: var(--remove); }
+  nav { padding: 12px 8px; flex: 1; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 6px; cursor: pointer; color: var(--muted); font-size: 13px; font-weight: 500; transition: all .15s; border: none; background: none; width: 100%; text-align: left; }
+  .nav-item:hover  { background: var(--card); color: var(--text); }
+  .nav-item.active { background: rgba(124,58,237,.2); color: #a78bfa; }
+  .nav-item .icon  { font-size: 16px; width: 20px; text-align: center; }
+  .nav-section { padding: 12px 10px 4px; font-size: 10px; font-weight: 700; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+  .guild-selector { padding: 10px 8px; border-top: 1px solid var(--border); }
+  .guild-selector select { width: 100%; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 7px 8px; font-size: 12px; }
+
+  /* Cards */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .stat-card  { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .stat-card .label { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+  .stat-card .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
+  .stat-card .sub   { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .stat-card.green .value { color: var(--safe); }
+  .stat-card.yellow .value { color: var(--caution); }
+  .stat-card.red .value    { color: var(--remove); }
+  .stat-card.blue .value   { color: var(--accent2); }
+
+  /* Section headers */
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .section-title  { font-size: 14px; font-weight: 700; color: var(--text); }
+  .badge          { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px; }
+  .badge.safe    { background: rgba(34,197,94,.15);  color: var(--safe); }
+  .badge.caution { background: rgba(245,158,11,.15); color: var(--caution); }
+  .badge.remove  { background: rgba(239,68,68,.15);  color: var(--remove); }
+  .badge.warn    { background: rgba(249,115,22,.15); color: var(--warn); }
+  .badge.muted   { background: rgba(139,148,158,.1); color: var(--muted); }
+
+  /* Feed */
+  .feed { display: flex; flex-direction: column; gap: 6px; }
+  .feed-item { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; display: grid; grid-template-columns: 32px 1fr auto; gap: 10px; align-items: start; transition: border-color .15s; }
+  .feed-item:hover { border-color: var(--accent); }
+  .feed-item.remove { border-left: 3px solid var(--remove); }
+  .feed-item.caution { border-left: 3px solid var(--caution); }
+  .feed-item.safe    { border-left: 3px solid var(--border); }
+  .feed-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .feed-body .meta { font-size: 11px; color: var(--muted); margin-bottom: 3px; }
+  .feed-body .meta strong { color: var(--text); }
+  .feed-body .content { font-size: 13px; color: var(--text); word-break: break-word; }
+  .feed-body .reason  { font-size: 11px; color: var(--caution); margin-top: 4px; }
+  .feed-body .reason.remove { color: var(--remove); }
+  .feed-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+  .feed-time { font-size: 10px; color: var(--muted); }
+  .severity-bar { width: 40px; height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; }
+  .severity-fill { height: 100%; border-radius: 2px; background: var(--safe); }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+  th { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; background: var(--surface); }
+  tr:hover td { background: rgba(255,255,255,.02); }
+  .btn { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-size: 12px; cursor: pointer; transition: all .15s; }
+  .btn:hover { border-color: var(--accent); color: #a78bfa; }
+  .btn.danger:hover { border-color: var(--remove); color: var(--remove); }
+
+  /* Settings */
+  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .settings-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .settings-card.full { grid-column: 1 / -1; }
+  .settings-card h3 { font-size: 13px; font-weight: 700; margin-bottom: 16px; color: var(--text); display: flex; align-items: center; gap: 8px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 10px; font-size: 13px; font-family: inherit;
+    transition: border-color .15s;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    outline: none; border-color: var(--accent);
+  }
+  .form-group textarea { resize: vertical; min-height: 90px; }
+  .form-group .hint { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-row .label { font-size: 13px; }
+  .toggle-row .desc  { font-size: 11px; color: var(--muted); }
+  .toggle { position: relative; width: 36px; height: 20px; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; inset: 0; background: var(--border); border-radius: 20px; cursor: pointer; transition: .2s; }
+  .toggle-slider::before { content: ''; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+  .toggle input:checked + .toggle-slider { background: var(--accent); }
+  .toggle input:checked + .toggle-slider::before { transform: translateX(16px); }
+  .save-btn { background: var(--accent); color: #fff; border: none; padding: 9px 20px; border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity .15s; }
+  .save-btn:hover { opacity: .85; }
+  .save-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  /* Page headers */
+  .page-title { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+  .page-sub   { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+
+  .empty { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; }
+  .toast { position: fixed; bottom: 20px; right: 20px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px 16px; font-size: 13px; opacity: 0; transition: opacity .3s; pointer-events: none; z-index: 999; }
+  .toast.show { opacity: 1; }
+  .online-pill { display: inline-flex; align-items: center; gap: 5px; background: rgba(34,197,94,.1); color: var(--safe); border-radius: 99px; padding: 3px 10px; font-size: 11px; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo">
+      <h1>🪼 Jelly Labs Studio</h1>
+      <div class="subtitle">Moderation Panel</div>
+    </div>
+    <nav>
+      <div class="nav-section">Moderation</div>
+      <button class="nav-item active" onclick="switchTab('overview')">
+        <span class="icon">📊</span> Overview
+      </button>
+      <button class="nav-item" onclick="switchTab('feed')">
+        <span class="icon">📡</span> Live Feed
+      </button>
+      <button class="nav-item" onclick="switchTab('users')">
+        <span class="icon">👥</span> Users
+      </button>
+      <div class="nav-section">Config</div>
+      <button class="nav-item" onclick="switchTab('settings')">
+        <span class="icon">⚙️</span> Settings
+      </button>
+    </nav>
+    <div class="guild-selector">
+      <select id="guildSelect" onchange="onGuildChange()">
+        <option value="">Loading servers...</option>
+      </select>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <!-- Overview Tab -->
+    <div id="tab-overview">
+      <div class="page-title">Overview</div>
+      <div class="page-sub" id="bot-status-line">Loading...</div>
+      <div class="stats-grid">
+        <div class="stat-card blue">
+          <div class="label">Messages Today</div>
+          <div class="value" id="stat-analyzed">—</div>
+          <div class="sub">analyzed by AI</div>
+        </div>
+        <div class="stat-card yellow">
+          <div class="label">Flagged Today</div>
+          <div class="value" id="stat-caution">—</div>
+          <div class="sub">needs review</div>
+        </div>
+        <div class="stat-card red">
+          <div class="label">Removed Today</div>
+          <div class="value" id="stat-removed">—</div>
+          <div class="sub">auto-deleted</div>
+        </div>
+        <div class="stat-card green">
+          <div class="label">Uptime</div>
+          <div class="value" id="stat-uptime">—</div>
+          <div class="sub" id="stat-model">model</div>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <div class="section-title">Recent Activity</div>
+        <button class="btn" onclick="loadFeed()">↻ Refresh</button>
+      </div>
+      <div class="feed" id="overview-feed"></div>
+    </div>
+
+    <!-- Feed Tab -->
+    <div id="tab-feed" style="display:none">
+      <div class="page-title">Live Feed</div>
+      <div class="page-sub">All messages analyzed by the AI — auto-refreshes every 5 seconds</div>
+      <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center">
+        <label style="font-size:12px;color:var(--muted)">Filter:</label>
+        <select id="feed-filter" onchange="renderFeed()" style="background:var(--card);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px">
+          <option value="all">All</option>
+          <option value="REMOVE">Removed only</option>
+          <option value="CAUTION">Flagged only</option>
+          <option value="not-safe">Non-SAFE</option>
+        </select>
+        <label style="font-size:12px;color:var(--muted);margin-left:8px">
+          <input type="checkbox" id="feed-auto" checked> Auto-refresh
+        </label>
+      </div>
+      <div class="feed" id="feed-list"></div>
+    </div>
+
+    <!-- Users Tab -->
+    <div id="tab-users" style="display:none">
+      <div class="page-title">Users</div>
+      <div class="page-sub">Users with moderation history in the selected server</div>
+      <div id="users-table-wrap">
+        <div class="empty">Select a server to view users</div>
+      </div>
+    </div>
+
+    <!-- Settings Tab -->
+    <div id="tab-settings" style="display:none">
+      <div class="page-title">Settings</div>
+      <div class="page-sub">Configure moderation for the selected server. Changes save immediately.</div>
+      <div id="settings-content"><div class="empty">Select a server to configure</div></div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';
+let currentGuildId = null;
+let allGuilds = [];
+let feedData  = [];
+let autoRefreshTimer = null;
+
+// ── Utilities ────────────────────────────────────────────────────────────────
+function toast(msg, color='#22c55e') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.borderColor = color;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+async function api(path, options) {
+  const r = await fetch(API + path, { headers: {'Content-Type':'application/json'}, ...options });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+function timeAgo(ts) {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s/60)}m ago`;
+  if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+  return new Date(ts).toLocaleDateString();
+}
+
+function formatUptime(secs) {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function verdictBadge(v) {
+  if (v === 'REMOVE') return `<span class="badge remove">REMOVE</span>`;
+  if (v === 'CAUTION') return `<span class="badge caution">CAUTION</span>`;
+  if (v === 'WARN') return `<span class="badge warn">WARN</span>`;
+  return `<span class="badge muted">SAFE</span>`;
+}
+
+function avatarLetter(username) {
+  return (username || '?')[0].toUpperCase();
+}
+
+function severityColor(s) {
+  if (s >= 4) return 'var(--remove)';
+  if (s >= 2) return 'var(--caution)';
+  return 'var(--safe)';
+}
+
+// ── Tab switching ────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('[id^="tab-"]').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  document.getElementById(`tab-${tab}`).style.display = '';
+  event.currentTarget.classList.add('active');
+
+  if (tab === 'feed')     renderFeed();
+  if (tab === 'users')    loadUsers();
+  if (tab === 'settings') loadSettings();
+}
+
+// ── Load status ──────────────────────────────────────────────────────────────
+async function loadStatus() {
+  try {
+    const data = await api('/api/status');
+    allGuilds = data.guilds || [];
+
+    document.getElementById('bot-status-line').innerHTML =
+      `<span class="online-pill"><span class="status-dot"></span> ${data.botTag} is online</span>
+       &nbsp;— model: <strong>${data.model}</strong>`;
+
+    document.getElementById('stat-analyzed').textContent = data.today.analyzed;
+    document.getElementById('stat-caution').textContent  = data.today.caution;
+    document.getElementById('stat-removed').textContent  = data.today.removed;
+    document.getElementById('stat-uptime').textContent   = formatUptime(data.uptime);
+    document.getElementById('stat-model').textContent    = data.model;
+
+    // Populate guild selector
+    const sel = document.getElementById('guildSelect');
+    if (!currentGuildId && allGuilds.length) currentGuildId = allGuilds[0].id;
+    sel.innerHTML = allGuilds.map(g =>
+      `<option value="${g.id}" ${g.id === currentGuildId ? 'selected' : ''}>${g.name}</option>`
+    ).join('');
+  } catch(e) {
+    document.getElementById('bot-status-line').textContent = '⚠️ Could not connect to bot';
+  }
+}
+
+// ── Load feed ────────────────────────────────────────────────────────────────
+async function loadFeed() {
+  try {
+    feedData = await api('/api/feed?limit=200');
+    renderFeed();
+    renderOverviewFeed();
+  } catch(e) {}
+}
+
+function renderFeedItem(item) {
+  const cls = item.verdict === 'REMOVE' ? 'remove' : item.verdict === 'CAUTION' ? 'caution' : 'safe';
+  const reasonHtml = item.verdict !== 'SAFE' && item.reason
+    ? `<div class="reason ${item.verdict === 'REMOVE' ? 'remove' : ''}">${item.reason}</div>`
+    : '';
+  const pct = Math.round((item.severity / 5) * 100);
+  return `
+    <div class="feed-item ${cls}">
+      <div class="feed-avatar" style="background:hsl(${(item.username||'').charCodeAt(0)*13%360},50%,45%)">${avatarLetter(item.username)}</div>
+      <div class="feed-body">
+        <div class="meta">
+          <strong>${item.username || 'Unknown'}</strong> in
+          <strong>#${item.channelName || '?'}</strong>
+          ${item.guildName ? `<span style="color:var(--muted)"> · ${item.guildName}</span>` : ''}
+        </div>
+        <div class="content">${escapeHtml(item.content || '')}</div>
+        ${reasonHtml}
+      </div>
+      <div class="feed-meta">
+        ${verdictBadge(item.verdict)}
+        <div class="severity-bar"><div class="severity-fill" style="width:${pct}%;background:${severityColor(item.severity)}"></div></div>
+        <div class="feed-time">${timeAgo(item.ts)}</div>
+      </div>
+    </div>`;
+}
+
+function renderFeed() {
+  const filter = document.getElementById('feed-filter')?.value || 'all';
+  const filtered = feedData.filter(item => {
+    if (filter === 'all') return true;
+    if (filter === 'not-safe') return item.verdict !== 'SAFE';
+    return item.verdict === filter;
+  });
+  const el = document.getElementById('feed-list');
+  if (!el) return;
+  el.innerHTML = filtered.length
+    ? filtered.map(renderFeedItem).join('')
+    : '<div class="empty">No messages yet — send some in Discord!</div>';
+}
+
+function renderOverviewFeed() {
+  const el = document.getElementById('overview-feed');
+  if (!el) return;
+  const recent = feedData.filter(i => i.verdict !== 'SAFE').slice(0, 10);
+  el.innerHTML = recent.length
+    ? recent.map(renderFeedItem).join('')
+    : '<div class="empty">No flagged messages yet today 🎉</div>';
+}
+
+// ── Load users ───────────────────────────────────────────────────────────────
+async function loadUsers() {
+  if (!currentGuildId) return;
+  const wrap = document.getElementById('users-table-wrap');
+  try {
+    const users = await api(`/api/users?guildId=${currentGuildId}`);
+    if (!users.length) { wrap.innerHTML = '<div class="empty">No users with violations 🎉</div>'; return; }
+    wrap.innerHTML = `
+      <table>
+        <thead><tr>
+          <th>User ID</th><th>Active Strikes</th><th>Total Events</th><th>Last Violation</th><th>Actions</th>
+        </tr></thead>
+        <tbody>
+          ${users.map(u => `
+            <tr>
+              <td><code style="font-size:12px">${u.userId}</code></td>
+              <td><span class="badge ${u.activeStrikes >= 3 ? 'remove' : u.activeStrikes >= 1 ? 'caution' : 'muted'}">${u.activeStrikes}</span></td>
+              <td>${u.totalViolations}</td>
+              <td>${u.lastViolation ? timeAgo(u.lastViolation) : '—'}</td>
+              <td>
+                <button class="btn danger" onclick="clearUser('${u.userId}')">Clear History</button>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch(e) { wrap.innerHTML = '<div class="empty">Error loading users</div>'; }
+}
+
+async function clearUser(userId) {
+  if (!confirm('Clear all mod history for this user?')) return;
+  try {
+    await api(`/api/violations/${userId}?guildId=${currentGuildId}`, { method: 'DELETE' });
+    toast('History cleared');
+    loadUsers();
+  } catch(e) { toast('Error: ' + e.message, 'var(--remove)'); }
+}
+
+// ── Load settings ─────────────────────────────────────────────────────────────
+async function loadSettings() {
+  if (!currentGuildId) return;
+  const wrap = document.getElementById('settings-content');
+  try {
+    const allCfg = await api('/api/config');
+    const gcfg   = allCfg[currentGuildId] || {};
+    wrap.innerHTML = buildSettingsHTML(gcfg);
+  } catch(e) { wrap.innerHTML = '<div class="empty">Error loading config</div>'; }
+}
+
+function buildSettingsHTML(gcfg) {
+  return `
+  <div class="settings-grid">
+
+    <!-- Community Identity (full width) -->
+    <div class="settings-card full">
+      <h3>🏰 Community Identity</h3>
+      <div class="form-group">
+        <label>Community Context</label>
+        <textarea id="cfg-communityContext" placeholder="Describe your server. e.g. 'This is a Christian family-friendly community server for followers of Lexi Carroll, a faith-based livestreamer. The community is welcoming, faith-centered, and upholds Christian values.'">${gcfg.communityContext || ''}</textarea>
+        <div class="hint">GPT reads this before analyzing every message — the more context, the smarter it gets.</div>
+      </div>
+      <div class="form-group">
+        <label>Key Person / VIP Description (e.g. Lexi)</label>
+        <textarea id="cfg-vipPersonDescription" placeholder="e.g. 'Lexi Carroll is the community leader and livestreamer. She is a young woman. Any sexual comments, romantic fixation, obsessive appearance comments, or inappropriate targeting directed at her — even if subtle — should be flagged as CAUTION or REMOVE immediately.'">${gcfg.vipPersonDescription || ''}</textarea>
+        <div class="hint">Any messages targeting this person will be held to a higher standard automatically.</div>
+      </div>
+      <button class="save-btn" onclick="saveCfg(['communityContext','vipPersonDescription'])">Save Community Identity</button>
+    </div>
+
+    <!-- Moderation Settings -->
+    <div class="settings-card">
+      <h3>🛡️ Moderation</h3>
+      <div class="toggle-row">
+        <div><div class="label">Auto-Moderation</div><div class="desc">Enable AI message scanning</div></div>
+        <label class="toggle"><input type="checkbox" id="cfg-enabled" ${gcfg.enabled !== false ? 'checked' : ''}><span class="toggle-slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div><div class="label">Profanity Filter</div><div class="desc">Block cuss words (church-appropriate)</div></div>
+        <label class="toggle"><input type="checkbox" id="cfg-profanityFilter" ${gcfg.profanityFilter !== false ? 'checked' : ''}><span class="toggle-slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div><div class="label">DM Warnings</div><div class="desc">Softly notify users when removed</div></div>
+        <label class="toggle"><input type="checkbox" id="cfg-dmWarnings" ${gcfg.dmWarnings !== false ? 'checked' : ''}><span class="toggle-slider"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div><div class="label">Log Caution Messages</div><div class="desc">Send borderline messages to mod-log</div></div>
+        <label class="toggle"><input type="checkbox" id="cfg-logCautionMessages" ${gcfg.logCautionMessages !== false ? 'checked' : ''}><span class="toggle-slider"></span></label>
+      </div>
+      <div class="form-group" style="margin-top:14px">
+        <label>AI Sensitivity</label>
+        <select id="cfg-sensitivity">
+          <option value="low"    ${gcfg.sensitivity==='low'    ? 'selected' : ''}>Low — only clear violations</option>
+          <option value="medium" ${gcfg.sensitivity==='medium' || !gcfg.sensitivity ? 'selected' : ''}>Medium — balanced (recommended)</option>
+          <option value="high"   ${gcfg.sensitivity==='high'   ? 'selected' : ''}>High — strict community standards</option>
+        </select>
+      </div>
+      <button class="save-btn" onclick="saveCfg(['enabled','profanityFilter','dmWarnings','logCautionMessages','sensitivity'])">Save</button>
+    </div>
+
+    <!-- Channel & Role Settings -->
+    <div class="settings-card">
+      <h3>📋 Channels & Roles</h3>
+      <div class="form-group">
+        <label>Mod Log Channel</label>
+        <input type="text" id="cfg-modLogChannel" value="${gcfg.modLogChannel || 'mod-log'}">
+        <div class="hint">Channel name (without #) where alerts are posted</div>
+      </div>
+      <div class="form-group">
+        <label>Mod Role to Ping</label>
+        <input type="text" id="cfg-modRoleName" value="${gcfg.modRoleName || 'Moderator'}">
+        <div class="hint">Role name to @mention on escalations</div>
+      </div>
+      <div class="form-group">
+        <label>Ignored Channels (comma-separated)</label>
+        <input type="text" id="cfg-ignoreChannels" value="${(gcfg.ignoreChannels || []).join(', ')}">
+        <div class="hint">These channels are never moderated</div>
+      </div>
+      <div class="form-group">
+        <label>Ping Moderators at Strike #</label>
+        <input type="number" id="cfg-strikePingAt" value="${gcfg.strikePingAt || 2}" min="1" max="10">
+      </div>
+      <button class="save-btn" onclick="saveCfg(['modLogChannel','modRoleName','ignoreChannels','strikePingAt'])">Save</button>
+    </div>
+
+    <!-- Strike & Discipline -->
+    <div class="settings-card">
+      <h3>⚡ Discipline</h3>
+      <div class="form-group">
+        <label>Strike Decay (days)</label>
+        <input type="number" id="cfg-strikeDecayDays" value="${gcfg.strikeDecayDays || 30}" min="1">
+        <div class="hint">Strikes older than this disappear</div>
+      </div>
+      <div class="form-group">
+        <label>Timeout at Strike 2 (minutes)</label>
+        <input type="number" id="cfg-timeout-2" value="${(gcfg.timeouts && gcfg.timeouts['2']) || 10}" min="0">
+      </div>
+      <div class="form-group">
+        <label>Timeout at Strike 3 (minutes)</label>
+        <input type="number" id="cfg-timeout-3" value="${(gcfg.timeouts && gcfg.timeouts['3']) || 60}" min="0">
+      </div>
+      <div class="form-group">
+        <label>Timeout at Strike 4+ (minutes)</label>
+        <input type="number" id="cfg-timeout-4" value="${(gcfg.timeouts && gcfg.timeouts['4']) || 1440}" min="0">
+      </div>
+      <button class="save-btn" onclick="saveTimeouts()">Save</button>
+    </div>
+
+    <!-- Model / Advanced -->
+    <div class="settings-card">
+      <h3>🤖 Advanced</h3>
+      <div class="form-group">
+        <label>AI Model</label>
+        <input type="text" id="cfg-model" value="${gcfg.model || ''}" placeholder="Uses server default (gpt-5.4-mini)">
+        <div class="hint">Leave blank to use the server default</div>
+      </div>
+      <div class="form-group">
+        <label>Dashboard Password</label>
+        <input type="password" id="cfg-dashboardPassword" value="${gcfg.dashboardPassword || ''}" placeholder="Leave blank for no password">
+      </div>
+      <button class="save-btn" onclick="saveCfg(['model','dashboardPassword'])">Save</button>
+    </div>
+
+  </div>`;
+}
+
+async function saveCfg(fields) {
+  if (!currentGuildId) { toast('No server selected', 'var(--remove)'); return; }
+  const body = {};
+  for (const f of fields) {
+    const el = document.getElementById(`cfg-${f}`);
+    if (!el) continue;
+    if (el.type === 'checkbox') body[f] = el.checked;
+    else if (el.type === 'number') body[f] = Number(el.value);
+    else if (f === 'ignoreChannels') body[f] = el.value.split(',').map(s => s.trim()).filter(Boolean);
+    else body[f] = el.value;
+  }
+  try {
+    await api(`/api/config/${currentGuildId}`, { method: 'PATCH', body: JSON.stringify(body) });
+    toast('✓ Saved');
+  } catch(e) { toast('Error: ' + e.message, 'var(--remove)'); }
+}
+
+async function saveTimeouts() {
+  if (!currentGuildId) return;
+  const body = { timeouts: {
+    2: Number(document.getElementById('cfg-timeout-2').value),
+    3: Number(document.getElementById('cfg-timeout-3').value),
+    4: Number(document.getElementById('cfg-timeout-4').value),
+  }};
+  try {
+    await api(`/api/config/${currentGuildId}`, { method: 'PATCH', body: JSON.stringify(body) });
+    toast('✓ Saved');
+  } catch(e) { toast('Error: ' + e.message, 'var(--remove)'); }
+}
+
+function onGuildChange() {
+  currentGuildId = document.getElementById('guildSelect').value;
+  const activeTab = [...document.querySelectorAll('[id^="tab-"]')].find(el => el.style.display !== 'none')?.id?.replace('tab-', '');
+  if (activeTab === 'users') loadUsers();
+  if (activeTab === 'settings') loadSettings();
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Auto-refresh ──────────────────────────────────────────────────────────────
+function startAutoRefresh() {
+  autoRefreshTimer = setInterval(() => {
+    loadStatus();
+    loadFeed();
+  }, 5000);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(async () => {
+  await loadStatus();
+  await loadFeed();
+  startAutoRefresh();
+})();
+</script>
+</body>
+</html>

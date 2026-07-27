@@ -1,0 +1,17 @@
+{
+  "1382868571071185120": {
+    "1252279151168327774": {
+      "violations": [
+        {
+          "ts": 1785147876069,
+          "verdict": "REMOVE",
+          "reason": "Contains profanity.",
+          "category": "profanity",
+          "content": "shit",
+          "channelId": "1382935305337831445"
+        }
+      ],
+      "targeting": {}
+    }
+  }
+}

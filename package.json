@@ -1,0 +1,15 @@
+{
+  "name": "ioturtle-modbot",
+  "version": "1.0.0",
+  "description": "Standalone AI moderation bot with Jelly Labs Studio dashboard",
+  "main": "modbot.js",
+  "scripts": {
+    "start": "node modbot.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.19.3",
+    "dotenv": "^16.5.0",
+    "express": "^4.22.2",
+    "openai": "^4.98.0"
+  }
+}
