@@ -13,6 +13,7 @@ const OpenAI = require('openai').default;
 const TOKEN = process.env.DISCORD_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const DASHBOARD_PASSWORD = process.env.DASHBOARD_PASSWORD || 'defaultpassword';
+const MOD_MODEL = process.env.MOD_MODEL || 'gpt-4o-mini';  // Override via .env: MOD_MODEL=gpt-4o
 const OWNER_ID = process.env.OWNER_ID;
 const BOT_NAME = process.env.BOT_NAME || 'Jelly Guardian';
 
@@ -154,7 +155,7 @@ async function gptAnalyze(message, sensitivity = 'medium') {
 
     // Stage 1: Context-free explicit content
     const stage1Response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: MOD_MODEL,
       messages: [{ role: 'user', content: STAGE1_PROMPT + '\n\nMessage: ' + message.content }],
       response_format: { type: 'json_object' },
       temperature: 0
@@ -172,7 +173,7 @@ async function gptAnalyze(message, sensitivity = 'medium') {
     const vipContext = referencesVip ? `\nThe message references VIP member: ${vipNames.join(', ')}` : '';
 
     const stage2Response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: MOD_MODEL,
       messages: [{ role: 'user', content: stage2Prompt + '\n\nMessage: ' + message.content + contextMsg + vipContext }],
       response_format: { type: 'json_object' },
       temperature: 0
@@ -455,7 +456,7 @@ app.get('/api/status', (req, res) => {
     status: 'online',
     botTag: `${client.user.username}#${client.user.discriminator}`,
     uptime: Math.floor(process.uptime()),
-    model: 'gpt-4o-mini',
+    model: MOD_MODEL,
     today: { analyzed, caution, removed },
     guilds: Array.from(client.guilds.cache.values()).map(g => ({
       id: g.id,
