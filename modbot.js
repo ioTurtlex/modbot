@@ -42,18 +42,15 @@ function getFeedLogPath(date = new Date()) {
 
 function loadFeedLog() {
   const archivePath = getFeedLogPath();
-  // First try today's archive
   if (fs.existsSync(archivePath)) {
     try {
       feedLog = JSON.parse(fs.readFileSync(archivePath, 'utf8')) || [];
       console.log(`[Feed] Loaded ${feedLog.length} messages from today's archive`);
       return;
     } catch (e) {
-      console.error('[Feed] Failed to load today's archive:', e.message);
+      console.error('[Feed] Failed to load today\'s archive:', e.message);
     }
   }
-  
-  // Fallback: load from master feed-log.json (for cross-day persistence)
   const masterPath = dataPath('feed-log');
   if (fs.existsSync(masterPath)) {
     try {
@@ -262,7 +259,7 @@ function addViolation(guildId, userId, verdict, reason, category, content, chann
     category,
     content: content.slice(0, 400),
     channelId,
-    username,  // store username for dashboard display
+    username,
   });
   // Keep last 200 violations per user
   if (record.violations.length > 200) record.violations.shift();
@@ -485,7 +482,7 @@ async function handleAction(msg, guildId, verdict, severity, reason, category, m
   const strikes = getActiveStrikes(guildId, uid);
 
   // Log the violation
-  addViolation(guildId, uid, verdict, reason, category, msg.content, msg.channel.id, msg.author.username);
+  addViolation(guildId, uid, verdict, reason, category, msg.content, msg.channel.id);
 
   const actionsTaken = [];
   let timeoutMinutes = 0;
@@ -786,7 +783,7 @@ client.on('messageCreate', async msg => {
     logDeletion(guildId, msg.id, msg.author.id, msg.author.username, msg.channel.name, msg.content, 'Rapid message spam', 'REMOVE', 'spam');
     
     try { await msg.delete(); } catch {}
-    addViolation(guildId, msg.author.id, 'REMOVE', 'Rapid message spam', 'spam', msg.content, msg.channel.id, msg.author.username);
+    addViolation(guildId, msg.author.id, 'REMOVE', 'Rapid message spam', 'spam', msg.content, msg.channel.id);
     const embed = new EmbedBuilder()
       .setColor(0xFF8800)
       .setTitle('🔇 Spam Detected')
@@ -874,7 +871,7 @@ client.on('interactionCreate', async inter => {
     if (sub === 'warn') {
       const u      = inter.options.getUser('user');
       const reason = inter.options.getString('reason');
-      addViolation(guildId, u.id, 'WARN', reason, 'manual', '[manual warning]', inter.channelId || '', u.username);
+      addViolation(guildId, u.id, 'WARN', reason, 'manual', '[manual warning]', inter.channelId || '');
       if (gcfg.dmWarnings) {
         try { await u.send(`⚠️ **Warning from a moderator.**\nReason: ${reason}\n\nPlease review the community rules.`); } catch {}
       }
@@ -1019,17 +1016,6 @@ dashApp.delete('/api/violations/:userId', (req, res) => {
   res.json({ ok: true });
 });
 
-// DELETE /api/violations?guildId=XXX (reset ALL violations for a guild, for testing)
-dashApp.delete('/api/violations', (req, res) => {
-  const guildId = req.query.guildId;
-  if (!guildId) return res.status(400).json({ error: 'guildId required' });
-  if (userRecords[guildId]) {
-    userRecords[guildId] = {};
-  }
-  saveRecords();
-  res.json({ ok: true, message: `All violations cleared for guild ${guildId}` });
-});
-
 // GET /api/deletions?limit=100&guildId=optional
 dashApp.get('/api/deletions', (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 100, 1000);
@@ -1065,19 +1051,15 @@ dashApp.patch('/api/config/:guildId', (req, res) => {
 dashApp.get('/api/users', (req, res) => {
   const guildId = req.query.guildId;
   const source  = guildId ? (userRecords[guildId] || {}) : {};
-  const users   = Object.entries(source).map(([uid, record]) => {
-    const lastVio = record.violations.length ? record.violations[record.violations.length - 1] : null;
-    return {
-      userId:        uid,
-      username:      lastVio?.username || 'unknown',  // get username from latest violation
-      activeStrikes: record.violations.filter(v => {
-        const gcfg = getGuildCfg(guildId);
-        return v.ts > Date.now() - gcfg.strikeDecayDays * 86400000 && v.verdict === 'REMOVE';
-      }).length,
-      totalViolations: record.violations.length,
-      lastViolation:   lastVio?.ts || null,
-    };
-  }).sort((a, b) => (b.lastViolation || 0) - (a.lastViolation || 0));
+  const users   = Object.entries(source).map(([uid, record]) => ({
+    userId:        uid,
+    activeStrikes: record.violations.filter(v => {
+      const gcfg = getGuildCfg(guildId);
+      return v.ts > Date.now() - gcfg.strikeDecayDays * 86400000 && v.verdict === 'REMOVE';
+    }).length,
+    totalViolations: record.violations.length,
+    lastViolation:   record.violations.length ? record.violations[record.violations.length - 1].ts : null,
+  })).sort((a, b) => (b.lastViolation || 0) - (a.lastViolation || 0));
   res.json(users);
 });
 
