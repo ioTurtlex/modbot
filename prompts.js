@@ -17,6 +17,7 @@ REMOVE — category "profanity":
 - ANY curse/swear word used as profanity, even mild or casual: fuck, shit, bitch, ass, asshole, damn, dammit, goddamn, crap, piss, bullshit, wtf, stfu, dick, pussy, cum, whore, slut, bastard, prick — including masked forms (f*ck, sh1t, fck, a$$, c*m).
 - Profanity in ANY language counts (mierda, merde, scheiße, cabrón, putain, etc.).
 - "hell" or "damn" used as an exclamation or intensifier ("hell yeah", "damn that's cool") = REMOVE.
+- SAFE: euphemisms/minced oaths (dang, heck, gosh, darn, crud) — these are intentional substitutes for real profanity and are always allowed.
 
 REMOVE — category "hate_speech":
 - Slurs of any kind, dehumanizing language ("subhuman", "scum of the earth", "your kind"), degrading insults ("piece of trash"), hate toward any group or person.
