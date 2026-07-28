@@ -224,6 +224,9 @@
     <div id="tab-users" style="display:none">
       <div class="page-title">Users</div>
       <div class="page-sub">Users with moderation history in the selected server</div>
+      <div style="margin-bottom: 16px;">
+        <button class="btn danger" onclick="resetAllViolations()" style="background: var(--remove); color: white; border: none;">🗑️ Reset All Violations (Testing)</button>
+      </div>
       <div id="users-table-wrap">
         <div class="empty">Select a server to view users</div>
       </div>
@@ -433,12 +436,13 @@ async function loadUsers() {
     wrap.innerHTML = `
       <table>
         <thead><tr>
-          <th>User ID</th><th>Active Strikes</th><th>Total Events</th><th>Last Violation</th><th>Actions</th>
+          <th>Username</th><th>User ID</th><th>Active Strikes</th><th>Total Events</th><th>Last Violation</th><th>Actions</th>
         </tr></thead>
         <tbody>
           ${users.map(u => `
             <tr>
-              <td><code style="font-size:12px">${u.userId}</code></td>
+              <td><strong>${u.username}</strong></td>
+              <td><code style="font-size:11px">${u.userId}</code></td>
               <td><span class="badge ${u.activeStrikes >= 3 ? 'remove' : u.activeStrikes >= 1 ? 'caution' : 'muted'}">${u.activeStrikes}</span></td>
               <td>${u.totalViolations}</td>
               <td>${u.lastViolation ? timeAgo(u.lastViolation) : '—'}</td>
@@ -456,6 +460,16 @@ async function clearUser(userId) {
   try {
     await api(`/api/violations/${userId}?guildId=${currentGuildId}`, { method: 'DELETE' });
     toast('History cleared');
+    loadUsers();
+  } catch(e) { toast('Error: ' + e.message, 'var(--remove)'); }
+}
+
+async function resetAllViolations() {
+  if (!currentGuildId) { toast('Select a server first', 'var(--remove)'); return; }
+  if (!confirm('⚠️ RESET ALL violations for this server? (Cannot undo)')) return;
+  try {
+    await api(`/api/violations?guildId=${currentGuildId}`, { method: 'DELETE' });
+    toast('✅ All violations cleared for this server');
     loadUsers();
   } catch(e) { toast('Error: ' + e.message, 'var(--remove)'); }
 }
