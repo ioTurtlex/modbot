@@ -540,25 +540,34 @@ async function resetAllViolations() {
 async function restartBot() {
   if (!confirm('🔄 Restart the bot? It will be offline for ~10 seconds.')) return;
   try {
-    await api(`/api/restart`, { method: 'POST' });
-    toast('🔄 Bot restarting... (will be back online in ~10 seconds)', 'var(--caution)');
+    console.log('[Dashboard] Sending restart request...');
+    const response = await api(`/api/restart`, { method: 'POST' });
+    console.log('[Dashboard] Restart response:', response);
+    toast('🔄 Bot restarting... reconnecting in ~10 seconds', 'var(--caution)');
+    
     // Poll for reconnection
     let attempts = 0;
     const checkConnection = setInterval(async () => {
       attempts++;
+      console.log(`[Dashboard] Reconnection attempt ${attempts}/30...`);
       try {
-        await api('/api/status');
+        const status = await api('/api/status');
+        console.log('[Dashboard] Bot reconnected!', status);
         clearInterval(checkConnection);
         toast('✅ Bot is back online!', 'var(--safe)');
         loadStatus();
       } catch (e) {
         if (attempts > 30) {
+          console.log('[Dashboard] Failed to reconnect after 30 attempts');
           clearInterval(checkConnection);
-          toast('Bot did not reconnect - check server logs', 'var(--remove)');
+          toast('⚠️ Bot offline > 30s - may still be starting. Try refreshing page.', 'var(--remove)');
         }
       }
     }, 1000);
-  } catch(e) { toast('Error: ' + e.message, 'var(--remove)'); }
+  } catch(e) { 
+    console.error('[Dashboard] Restart error:', e);
+    toast('❌ Restart failed: ' + e.message, 'var(--remove)'); 
+  }
 }
 
 // ── Load settings ─────────────────────────────────────────────────────────────
