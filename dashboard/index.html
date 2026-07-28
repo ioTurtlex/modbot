@@ -447,12 +447,70 @@ async function loadUsers() {
               <td>${u.totalViolations}</td>
               <td>${u.lastViolation ? timeAgo(u.lastViolation) : '—'}</td>
               <td>
-                <button class="btn danger" onclick="clearUser('${u.userId}')">Clear History</button>
+                <button class="btn" onclick="viewUserReport('${u.userId}', '${u.username}')">📋 View Report</button>
+                <button class="btn danger" onclick="clearUser('${u.userId}')">🗑️ Clear</button>
               </td>
             </tr>`).join('')}
         </tbody>
       </table>`;
   } catch(e) { wrap.innerHTML = '<div class="empty">Error loading users</div>'; }
+}
+
+async function viewUserReport(userId, username) {
+  const report = await api(`/api/user-report/${userId}?guildId=${currentGuildId}`);
+  let html = `
+    <div class="modal-content" style="max-width: 800px; max-height: 80vh; overflow-y: auto;">
+      <h2>📋 Violation Report: <strong>${username}</strong></h2>
+      <p style="color: var(--muted); margin-bottom: 16px;">User ID: <code>${userId}</code></p>
+      
+      <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 20px;">
+        <div class="stat-card">
+          <div class="label">Total Violations</div>
+          <div class="value">${report.totalViolations}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Active Strikes</div>
+          <div class="value">${report.activeStrikes}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Removed</div>
+          <div class="value">${report.violationsByType.REMOVE || 0}</div>
+        </div>
+        <div class="stat-card">
+          <div class="label">Caution</div>
+          <div class="value">${report.violationsByType.CAUTION || 0}</div>
+        </div>
+      </div>
+      
+      <h3 style="margin-top: 24px; margin-bottom: 12px;">Recent Violations</h3>
+      <div style="background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;">
+        ${report.violations.length ? report.violations.map((v, i) => `
+          <div style="padding: 12px; border-bottom: 1px solid var(--border); ${i === 0 ? '' : ''}">
+            <div style="display: flex; justify-content: space-between; align-items: start; gap: 12px;">
+              <div style="flex: 1;">
+                <div style="font-size: 11px; color: var(--muted); margin-bottom: 4px;">${v.date}</div>
+                <div style="display: flex; gap: 8px; margin-bottom: 6px;">
+                  <span class="badge ${v.verdict === 'REMOVE' ? 'remove' : v.verdict === 'CAUTION' ? 'caution' : v.verdict === 'WARN' ? 'warn' : 'safe'}">${v.verdict}</span>
+                  <span class="badge" style="background: var(--muted);">${v.category}</span>
+                </div>
+                <div style="font-size: 12px; margin-bottom: 4px;"><strong>Reason:</strong> ${v.reason}</div>
+                <div style="font-size: 11px; color: var(--muted); word-break: break-word;"><strong>Content:</strong> "${v.content.slice(0, 100)}${v.content.length > 100 ? '...' : ''}"</div>
+              </div>
+              <div style="text-align: right; white-space: nowrap;">
+                <div style="font-size: 12px; font-weight: 600;">Severity: <span style="color: ${v.severity >= 4 ? 'var(--remove)' : v.severity >= 2 ? 'var(--caution)' : 'var(--safe)'}">${v.severity || 0}/5</span></div>
+              </div>
+            </div>
+          </div>
+        `).reverse().join('') : '<div style="padding: 12px; text-align: center; color: var(--muted);">No violations</div>'}
+      </div>
+      
+      <div style="margin-top: 20px; display: flex; gap: 8px;">
+        <button class="btn danger" onclick="clearUser('${userId}'); document.querySelector('.modal-backdrop')?.click();">🗑️ Clear All History</button>
+        <button class="btn" onclick="document.querySelector('.modal-backdrop')?.click();">Close</button>
+      </div>
+    </div>
+  `;
+  showModal(html);
 }
 
 async function clearUser(userId) {
@@ -640,6 +698,23 @@ function onGuildChange() {
   const activeTab = [...document.querySelectorAll('[id^="tab-"]')].find(el => el.style.display !== 'none')?.id?.replace('tab-', '');
   if (activeTab === 'users') loadUsers();
   if (activeTab === 'settings') loadSettings();
+}
+
+function showModal(html) {
+  let modal = document.getElementById('modal-container');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-container';
+    modal.style.cssText = `
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+      z-index: 1000; backdrop-filter: blur(2px);
+    `;
+    modal.className = 'modal-backdrop';
+    modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `<div style="background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px; max-width: 90vw;">${html}</div>`;
 }
 
 function escapeHtml(str) {
