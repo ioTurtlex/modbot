@@ -80,12 +80,18 @@ function saveFeedLog() {
   const archivePath = getFeedLogPath();
   const masterPath = dataPath('feed-log');
   try {
+    // Ensure data directory exists
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    
     // Save to today's archive (persistent)
     fs.writeFileSync(archivePath, JSON.stringify(feedLog, null, 2));
     // Also save to master feed-log.json (for cross-day access)
     fs.writeFileSync(masterPath, JSON.stringify(feedLog.slice(0, 500), null, 2));
+    console.log(`[Feed] Saved ${feedLog.length} messages to ${archivePath}`);
   } catch (e) {
-    console.error('[Feed] SAVE ERROR:', e.message);
+    console.error('[Feed] SAVE ERROR:', e.message, '| Path:', archivePath);
   }
 }
 
@@ -1148,6 +1154,20 @@ dashApp.get('/api/user-report/:userId', (req, res) => {
       username: v.username || 'Unknown',
       severity: v.severity || 0,
     })).reverse(), // newest first
+  });
+});
+
+// GET /api/debug (diagnostic info)
+dashApp.get('/api/debug', (req, res) => {
+  res.json({
+    feedLogCount: feedLog.length,
+    feedLogSample: feedLog.slice(0, 3),
+    userRecordsKeys: Object.keys(userRecords),
+    guildSummary: Object.entries(userRecords).map(([guildId, guild]) => ({
+      guildId,
+      userCount: Object.keys(guild).length,
+      totalViolations: Object.values(guild).reduce((sum, u) => sum + (u.violations?.length || 0), 0),
+    })),
   });
 });
 
