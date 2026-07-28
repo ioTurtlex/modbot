@@ -110,12 +110,15 @@ function saveFeedLog() {
   try {
     // Ensure data directory exists
     if (!fs.existsSync(DATA_DIR)) {
+      console.log(`[Feed] Creating DATA_DIR: ${DATA_DIR}`);
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
     // Save to feed.json (max 500 messages)
-    fs.writeFileSync(feedPath, JSON.stringify(feedLog.slice(0, 500), null, 2));
+    const feedSlice = feedLog.slice(0, 500);
+    fs.writeFileSync(feedPath, JSON.stringify(feedSlice, null, 2));
+    console.log(`[Feed] ✓ SAVED ${feedSlice.length} messages to ${feedPath}`);
   } catch (e) {
-    console.error('[Feed] SAVE ERROR:', e.message);
+    console.error(`[Feed] ❌ SAVE ERROR to ${feedPath}:`, e.message);
   }
 }
 
@@ -129,6 +132,7 @@ function addToFeed(entry) {
     feedDay = today;
   }
   
+  console.log(`[Feed] Adding message from @${entry.username}: "${entry.content.slice(0, 40)}..." [verdict=${entry.verdict}]`);
   saveFeedLog(); // save to disk after each entry
 }
 
@@ -1152,6 +1156,34 @@ dashApp.get('/api/diagnostics', (req, res) => {
       contentLength: feedFileContents ? (Array.isArray(feedFileContents) ? feedFileContents.length : 'not-array') : null,
       sample: Array.isArray(feedFileContents) ? feedFileContents.slice(0, 2) : null
     }
+  });
+});
+
+// GET /api/test-feed - Add a test message to feed (for debugging)
+dashApp.get('/api/test-feed', (req, res) => {
+  const testMsg = {
+    ts: Date.now(),
+    guildId: 'test-guild',
+    guildName: 'Test Server',
+    channelName: 'test-channel',
+    userId: 'test-user-123',
+    username: 'TestUser',
+    content: 'This is a test message to verify feed saving works',
+    verdict: 'SAFE',
+    severity: 0,
+    reason: 'Test entry',
+    category: 'test',
+    action: 'pending'
+  };
+  
+  console.log('[TEST] Adding test message to feed...');
+  addToFeed(testMsg);
+  
+  res.json({ 
+    ok: true, 
+    message: 'Test message added to feed',
+    feedLength: feedLog.length,
+    testMsg
   });
 });
 
