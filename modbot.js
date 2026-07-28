@@ -11,6 +11,7 @@ const TOKEN      = process.env.DISCORD_TOKEN;
 const CLIENT_ID  = process.env.CLIENT_ID;
 const openai     = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const MOD_MODEL  = process.env.MOD_MODEL || 'gpt-5.4-mini';  // use latest model
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme123'; // Default password - CHANGE IN .env!
 const BOT_START  = Date.now();
 
 const DATA_DIR = path.join(__dirname, 'data');
@@ -1071,19 +1072,85 @@ client.on('interactionCreate', async inter => {
 const dashApp = express();
 dashApp.use(express.json());
 
+// ─── Session Management ────────────────────────────────────────────────────────
+const activeSessions = new Map(); // { sessionId: { createdAt, lastUsed } }
+const SESSION_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours
+
+function generateSessionId() {
+  return require('crypto').randomBytes(32).toString('hex');
+}
+
+function createSession() {
+  const sessionId = generateSessionId();
+  const now = Date.now();
+  activeSessions.set(sessionId, { createdAt: now, lastUsed: now });
+  return sessionId;
+}
+
+function isValidSession(sessionId) {
+  if (!sessionId || !activeSessions.has(sessionId)) return false;
+  const session = activeSessions.get(sessionId);
+  const age = Date.now() - session.lastUsed;
+  if (age > SESSION_TIMEOUT) {
+    activeSessions.delete(sessionId);
+    return false;
+  }
+  session.lastUsed = Date.now(); // Update last used time
+  return true;
+}
+
+function requireAuth(req, res, next) {
+  const sessionId = req.headers['x-session-id'] || req.query.sessionId;
+  if (!isValidSession(sessionId)) {
+    return res.status(401).json({ error: 'Unauthorized - please log in' });
+  }
+  req.sessionId = sessionId;
+  next();
+}
+
 // Serve dashboard UI
 const DASH_PUBLIC = path.join(__dirname, 'dashboard');
 if (!fs.existsSync(DASH_PUBLIC)) fs.mkdirSync(DASH_PUBLIC, { recursive: true });
 dashApp.use(express.static(DASH_PUBLIC));
 
-// Simple password middleware (optional)
+// ─── Authentication Endpoints ──────────────────────────────────────────────────
+// POST /api/login - Authenticate with password
+dashApp.post('/api/login', (req, res) => {
+  const { password } = req.body;
+  if (!password) {
+    return res.status(400).json({ error: 'Password required' });
+  }
+  if (password !== ADMIN_PASSWORD) {
+    console.log('[Auth] ❌ Failed login attempt');
+    return res.status(401).json({ error: 'Invalid password' });
+  }
+  const sessionId = createSession();
+  console.log('[Auth] ✅ Login successful - session created');
+  res.json({ ok: true, sessionId });
+});
+
+// POST /api/logout - Clear session
+dashApp.post('/api/logout', (req, res) => {
+  const sessionId = req.headers['x-session-id'];
+  if (sessionId) {
+    activeSessions.delete(sessionId);
+    console.log('[Auth] 🚪 Logged out');
+  }
+  res.json({ ok: true });
+});
+
+// ─── Middleware: Require auth for all /api calls except /login ──────────────────
 dashApp.use('/api', (req, res, next) => {
-  const anyGuildCfg = Object.values(cfg)[0] || {};
-  const pwd = anyGuildCfg.dashboardPassword || process.env.DASHBOARD_PASSWORD || '';
-  if (!pwd) return next();
-  const provided = req.headers['x-dashboard-password'] || req.query.password || '';
-  if (provided !== pwd) return res.status(401).json({ error: 'Unauthorized' });
-  next();
+  // Allow login and logout without auth
+  if (req.path === '/login' || req.path === '/logout') {
+    return next();
+  }
+  // Require valid session for all other endpoints
+  if (!requireAuth(req, res, next)) {
+    // requireAuth already sent the 401 response
+  } else {
+    next();
+  }
 });
 
 // GET /api/status
