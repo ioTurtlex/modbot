@@ -14,10 +14,9 @@ Judge ONLY the literal message text. Respond with ONLY a JSON object (no markdow
 
 REMOVE — category "profanity":
 - FIRST check the RELIGIOUS EXCEPTION: sincere religious or theological statements are ALWAYS SAFE even when they contain hell/damnation-root words — "Jesus saves us from damnation", "the sermon was about heaven and hell", "hell is real, repent", "God's judgment". This is a Christian server; talking about hell and damnation theologically is normal and welcome.
-- ANY curse/swear word used as profanity, even mild or casual: fuck, shit, bitch, ass, asshole, damn, dammit, goddamn, crap, piss, bullshit, wtf, stfu, dick, pussy, cum, whore, slut, bastard, prick — including masked forms (f*ck, sh1t, fck, a$$, c*m).
+- HARDCORE profanity only: fuck, shit, bitch, asshole, crap, piss, bullshit, wtf, stfu, dick, pussy, cum, whore, slut, bastard, prick — including masked forms (f*ck, sh1t, fck, a$$, c*m).
 - Profanity in ANY language counts (mierda, merde, scheiße, cabrón, putain, etc.).
-- "hell" or "damn" used as an exclamation or intensifier ("hell yeah", "damn that's cool") = REMOVE.
-- SAFE: euphemisms/minced oaths (dang, heck, gosh, darn, crud) — these are intentional substitutes for real profanity and are always allowed.
+- SAFE: mild exclamations (damn, dammit, dang, hell yeah, hell no, heck, gosh, darn, crud, crap as an exclamation) — these are socially acceptable and allowed.
 
 REMOVE — category "hate_speech":
 - Slurs of any kind, dehumanizing language ("subhuman", "scum of the earth", "your kind"), degrading insults ("piece of trash"), hate toward any group or person.

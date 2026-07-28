@@ -35,9 +35,11 @@ if (!cfg.customStage1Prompt) cfg.customStage1Prompt = STAGE1_PROMPT;
 if (!cfg.customStage2Prompt) cfg.customStage2Prompt = SENSITIVITY_PROMPTS.medium;
 if (!cfg.customProfanityList) {
   cfg.customProfanityList = [
-    'fuck', 'shit', 'bitch', 'ass', 'asshole', 'damn', 'dammit', 'goddamn', 'crap', 
-    'piss', 'bullshit', 'wtf', 'stfu', 'dick', 'pussy', 'cum', 'whore', 'slut', 
-    'bastard', 'prick', 'mierda', 'merde', 'scheiße', 'cabrón', 'putain'
+    // HARDCORE profanity only — mild exclamations (damn, dang, heck, darn) are allowed
+    'fuck', 'shit', 'bitch', 'asshole', 'piss', 'bullshit', 'wtf', 'stfu', 'dick', 
+    'pussy', 'cum', 'whore', 'slut', 'bastard', 'prick', 
+    // International profanity
+    'mierda', 'merde', 'scheiße', 'cabrón', 'putain'
   ];
 }
 
