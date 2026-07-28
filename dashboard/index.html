@@ -732,9 +732,17 @@ async function restartBot() {
 async function loadPrompts() {
   try {
     const data = await api('/api/prompts');
-    document.getElementById('stage1-prompt').value = data.stage1;
-    document.getElementById('stage2-prompt').value = data.stage2;
-    document.getElementById('profanity-list').value = data.profanityList.join(', ');
+    
+    // Fallback to defaults if undefined/empty
+    const stage1 = data.stage1 || '(Loading Stage 1 prompt...)';
+    const stage2 = data.stage2 || '(Loading Stage 2 prompt...)';
+    const profanityList = (data.profanityList && data.profanityList.length > 0) 
+      ? data.profanityList.join(', ') 
+      : '(No profanity words configured)';
+    
+    document.getElementById('stage1-prompt').value = stage1;
+    document.getElementById('stage2-prompt').value = stage2;
+    document.getElementById('profanity-list').value = profanityList;
     console.log('[Dashboard] ✅ Loaded prompts and profanity list');
   } catch (e) {
     console.error('[Dashboard] Error loading prompts:', e);

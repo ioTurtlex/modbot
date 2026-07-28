@@ -31,8 +31,15 @@ let userRecords = loadData('violations'); // { guildId: { userId: UserRecord } }
 
 // ─── Custom prompts & profanity (stored in config) ─────────────────────────────
 // Initialize with defaults from prompts.js
-if (!cfg.customStage1Prompt) cfg.customStage1Prompt = STAGE1_PROMPT;
-if (!cfg.customStage2Prompt) cfg.customStage2Prompt = SENSITIVITY_PROMPTS.medium;
+let promptsInitialized = false;
+if (!cfg.customStage1Prompt) {
+  cfg.customStage1Prompt = STAGE1_PROMPT;
+  promptsInitialized = true;
+}
+if (!cfg.customStage2Prompt) {
+  cfg.customStage2Prompt = SENSITIVITY_PROMPTS.medium;
+  promptsInitialized = true;
+}
 if (!cfg.customProfanityList) {
   cfg.customProfanityList = [
     // HARDCORE profanity only — mild exclamations (damn, dang, heck, darn) are allowed
@@ -41,10 +48,17 @@ if (!cfg.customProfanityList) {
     // International profanity
     'mierda', 'merde', 'scheiße', 'cabrón', 'putain'
   ];
+  promptsInitialized = true;
 }
 
 const saveCfg     = () => saveData('config', cfg);
 const saveRecords = () => saveData('violations', userRecords);
+
+// Save prompts to disk on initialization
+if (promptsInitialized) {
+  saveCfg();
+  console.log('[Init] ✓ Default prompts & profanity saved to config.json');
+}
 
 // ─── Live feed log (for dashboard) ────────────────────────────────────────────
 // FEED = All messages checked by bot (SAFE + CAUTION + REMOVE)
