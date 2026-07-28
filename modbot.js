@@ -282,6 +282,40 @@ function addViolation(guildId, userId, verdict, reason, category, content, chann
   saveRecords();
 }
 
+// Backfill missing usernames in old violations
+function backfillMissingUsernames() {
+  let fixed = 0;
+  for (const guildId in userRecords) {
+    for (const userId in userRecords[guildId]) {
+      const record = userRecords[guildId][userId];
+      if (!record.violations) continue;
+      
+      // Find the last violation with a username
+      let lastUsername = null;
+      for (let i = record.violations.length - 1; i >= 0; i--) {
+        if (record.violations[i].username) {
+          lastUsername = record.violations[i].username;
+          break;
+        }
+      }
+      
+      // If found, backfill all violations without username
+      if (lastUsername) {
+        for (let i = 0; i < record.violations.length; i++) {
+          if (!record.violations[i].username) {
+            record.violations[i].username = lastUsername;
+            fixed++;
+          }
+        }
+      }
+    }
+  }
+  if (fixed > 0) {
+    console.log(`[backfill] Fixed ${fixed} violations with missing usernames`);
+    saveRecords();
+  }
+}
+
 function trackTargeting(guildId, uid, targetIds, windowHours) {
   if (!targetIds.length) return;
   const record  = getUserRecord(guildId, uid);
@@ -498,7 +532,7 @@ async function handleAction(msg, guildId, verdict, severity, reason, category, m
   const strikes = getActiveStrikes(guildId, uid);
 
   // Log the violation
-  addViolation(guildId, uid, verdict, reason, category, msg.content, msg.channel.id);
+  addViolation(guildId, uid, verdict, reason, category, msg.content, msg.channel.id, msg.author.username);
 
   const actionsTaken = [];
   let timeoutMinutes = 0;
@@ -775,6 +809,7 @@ client.once('clientReady', () => {
   // Load persistent data from disk
   loadDeletionLog();
   loadFeedLog();
+  backfillMissingUsernames();  // Fix old violations without usernames
   
   // Setup daily deletion log backup
   setInterval(backupDeletionLog, 24 * 60 * 60 * 1000);  // backup every 24 hours
@@ -799,7 +834,7 @@ client.on('messageCreate', async msg => {
     logDeletion(guildId, msg.id, msg.author.id, msg.author.username, msg.channel.name, msg.content, 'Rapid message spam', 'REMOVE', 'spam');
     
     try { await msg.delete(); } catch {}
-    addViolation(guildId, msg.author.id, 'REMOVE', 'Rapid message spam', 'spam', msg.content, msg.channel.id);
+    addViolation(guildId, msg.author.id, 'REMOVE', 'Rapid message spam', 'spam', msg.content, msg.channel.id, msg.author.username);
     const embed = new EmbedBuilder()
       .setColor(0xFF8800)
       .setTitle('🔇 Spam Detected')
@@ -887,7 +922,7 @@ client.on('interactionCreate', async inter => {
     if (sub === 'warn') {
       const u      = inter.options.getUser('user');
       const reason = inter.options.getString('reason');
-      addViolation(guildId, u.id, 'WARN', reason, 'manual', '[manual warning]', inter.channelId || '');
+      addViolation(guildId, u.id, 'WARN', reason, 'manual', '[manual warning]', inter.channelId || '', u.username);
       if (gcfg.dmWarnings) {
         try { await u.send(`⚠️ **Warning from a moderator.**\nReason: ${reason}\n\nPlease review the community rules.`); } catch {}
       }
@@ -1061,6 +1096,59 @@ dashApp.patch('/api/config/:guildId', (req, res) => {
   Object.assign(cfg[guildId], req.body);
   saveCfg();
   res.json({ ok: true, cfg: cfg[guildId] });
+});
+
+// GET /api/user-report/:userId?guildId=XXX (detailed violation history)
+dashApp.get('/api/user-report/:userId', (req, res) => {
+  const guildId = req.query.guildId;
+  const userId = req.params.userId;
+  if (!guildId) return res.status(400).json({ error: 'guildId required' });
+  
+  const record = getUserRecord(guildId, userId);
+  if (!record.violations.length) {
+    return res.json({ userId, username: 'Unknown', violations: [], summary: {} });
+  }
+  
+  // Get username from latest violation
+  let username = userId.slice(0, 8);
+  for (let i = record.violations.length - 1; i >= 0; i--) {
+    if (record.violations[i].username) {
+      username = record.violations[i].username;
+      break;
+    }
+  }
+  
+  const gcfg = getGuildCfg(guildId);
+  const strikeDecay = gcfg.strikeDecayDays * 86400000;
+  
+  // Build summary
+  const violationsByType = {};
+  let activeStrikes = 0;
+  for (const v of record.violations) {
+    if (!violationsByType[v.verdict]) violationsByType[v.verdict] = 0;
+    violationsByType[v.verdict]++;
+    if (v.ts > Date.now() - strikeDecay && v.verdict === 'REMOVE') activeStrikes++;
+  }
+  
+  res.json({
+    userId,
+    username,
+    totalViolations: record.violations.length,
+    activeStrikes,
+    violationsByType,
+    violations: record.violations.map((v, i) => ({
+      index: i,
+      ts: v.ts,
+      date: new Date(v.ts).toLocaleString(),
+      verdict: v.verdict,
+      reason: v.reason,
+      category: v.category,
+      content: v.content,
+      channel: v.channelId,
+      username: v.username || 'Unknown',
+      severity: v.severity || 0,
+    })).reverse(), // newest first
+  });
 });
 
 // GET /api/users (all users with any violations, for dashboard user list)
