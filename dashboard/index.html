@@ -177,9 +177,6 @@
         <span class="icon">👥</span> Users
       </button>
       <div class="nav-section">System</div>
-      <button class="nav-item" onclick="switchTab('backups')">
-        <span class="icon">💾</span> Backups
-      </button>
       <button class="nav-item" onclick="switchTab('settings')">
         <span class="icon">⚙️</span> Settings
       </button>
@@ -306,37 +303,7 @@
       </div>
     </div>
 
-    <!-- Backups Tab -->
-    <div id="tab-backups" style="display:none">
-      <div class="page-title">💾 Server Backups</div>
-      <div class="page-sub">Automatic daily backups at 2 AM PST • Trigger manual backups anytime</div>
-      <div id="backup-status"></div>
-      <div class="settings-grid">
-        <div class="settings-card full">
-          <h3>🚀 Backup Controls</h3>
-          <div class="toggle-row">
-            <div>
-              <div class="label">Trigger Manual Backup</div>
-              <div class="desc">Creates a snapshot of server configuration, roles, and channels</div>
-            </div>
-            <button class="save-btn" onclick="triggerBackup(this)">📥 Backup Now</button>
-          </div>
-          <div class="toggle-row" style="border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px;">
-            <div>
-              <div class="label">Auto-Backup Schedule</div>
-              <div class="desc">Runs daily at 2 AM PST/PDT</div>
-            </div>
-            <div class="online-pill">✅ Enabled</div>
-          </div>
-        </div>
-        <div class="settings-card full">
-          <h3>📋 Backup History</h3>
-          <div id="backups-list" style="max-height: 400px; overflow-y: auto;">
-            <div class="empty">Loading backups...</div>
-          </div>
-        </div>
-      </div>
-    </div>
+
   </main>
 </div>
 
@@ -477,7 +444,6 @@ function switchTab(tab) {
   if (tab === 'users')    loadUsers();
   if (tab === 'settings') loadSettings();
   if (tab === 'prompts')  loadPrompts();
-  if (tab === 'backups')  loadBackups();
 }
 
 // ── Load status ──────────────────────────────────────────────────────────────
@@ -1003,91 +969,7 @@ function startAutoRefresh() {
 
 
 // ── Backups ──────────────────────────────────────────────────────────────────
-async function loadBackups() {
-  try {
-    const [backups, status] = await Promise.all([
-      api('/api/backups'),
-      api('/api/backup-status')
-    ]);
-    renderBackupStatus(status);
-    renderBackups(backups);
-  } catch (err) {
-    document.getElementById('backups-list').innerHTML = '<div class="empty">Failed to load backups</div>';
-  }
-}
 
-function renderBackupStatus(status) {
-  const statusDiv = document.getElementById('backup-status');
-  if (!statusDiv) return;
-  
-  const statusColor = status.isRunning ? '#f59e0b' : (status.status === 'complete' ? '#22c55e' : '#8b949e');
-  const statusText = status.isRunning ? '⏳ Running...' : (status.status === 'complete' ? '✅ Idle' : '⚫ ' + status.status);
-  
-  statusDiv.innerHTML = `
-    <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin-bottom: 16px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-        <div style="font-weight: 600; color: ${statusColor};">${statusText}</div>
-        <button class="btn" style="font-size: 11px; padding: 4px 8px;" onclick="loadBackups()">🔄 Refresh</button>
-      </div>
-      <div style="font-size: 11px; color: var(--muted); line-height: 1.6;">
-        <div>Last backup: ${status.lastBackupTime}</div>
-        <div>Next scheduled: ${status.nextBackupTime}</div>
-        <div>Total backups: ${status.totalBackups}</div>
-      </div>
-    </div>
-  `;
-}
-
-function renderBackups(backups) {
-  const container = document.getElementById('backups-list');
-  if (!backups || backups.length === 0) {
-    container.innerHTML = '<div class="empty">No backups yet. Click "Backup Now" to create one.</div>';
-    return;
-  }
-  
-  container.innerHTML = backups.map(b => `
-    <div style="padding: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-      <div>
-        <div style="font-size: 13px; color: var(--text); font-weight: 500;">${b.name}</div>
-        <div style="font-size: 11px; color: var(--muted); margin-top: 3px;">${b.timestamp}</div>
-        <div style="font-size: 11px; color: var(--muted);">${b.size} KB</div>
-      </div>
-      <button class="btn" onclick="downloadBackup('${b.name}')">⬇️</button>
-    </div>
-  `).join('');
-}
-
-async function triggerBackup(btn) {
-  try {
-    btn.disabled = true;
-    btn.textContent = '⏳ Creating...';
-    
-    const result = await api('/api/backup-trigger', { method: 'POST' });
-    
-    if (result.status === 'already-running') {
-      toast('⏳ Backup already running. Please wait...', '#f59e0b');
-      // Still poll while running
-      const pollInterval = setInterval(async () => {
-        const status = await api('/api/backup-status');
-        if (!status.isRunning) {
-          clearInterval(pollInterval);
-          await loadBackups();
-          toast('✅ Backup complete!', '#22c55e');
-        }
-      }, 2000);
-    } else if (result.status === 'complete') {
-      toast(`✅ ${result.message}`, '#22c55e');
-      await loadBackups();
-    } else {
-      toast(result.message, '#22c55e');
-    }
-    
-  } catch (err) {
-    toast('❌ Backup failed: ' + err.message, '#ef4444');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '📥 Backup Now';
-  }
 }
 
 function downloadBackup(filename) {
