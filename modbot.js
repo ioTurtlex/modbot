@@ -443,15 +443,8 @@ async function checkWithGPT(content) {
 
 
 // ─── Action / discipline (Stage 3) ────────────────────────────────────────────
-async function applyTimeout(member, minutes, reason) {
-  try {
-    await member.timeout(minutes * 60 * 1000, reason);
-    return true;
-  } catch (e) {
-    console.error(`[modbot] Timeout failed for ${member.user.tag}:`, e.message);
-    return false;
-  }
-}
+// Timeout/mute removed — bot lacks Manage Members intent.
+// Message deletion + violation tracking is the primary moderation mechanism.
 
 async function sendModLog(guild, guildId, embed, pingSeverity = false) {
   const gcfg = getGuildCfg(guildId);
@@ -501,27 +494,15 @@ async function handleAction(msg, guildId, verdict, severity, reason, category, m
       }
     }
 
-    // Progressive discipline based on active strike count (after this violation)
+    // Note: Timeout/mute removed — bot lacks Manage Members intent.
+    // Message deletion + violation tracking is sufficient; admins can manually action users via dashboard.
     const newStrikes = strikes + 1;
-
-    if (gcfg.timeouts[newStrikes]) {
-      timeoutMinutes = gcfg.timeouts[newStrikes];
-      try {
-        const member = await guild.members.fetch(uid);
-        const timed  = await applyTimeout(member, timeoutMinutes, reason);
-        if (timed) actionsTaken.push(`${timeoutMinutes}min timeout`);
-      } catch (err) {
-        console.error(`[modbot] Failed to timeout member: ${err.message}`);
-      }
-    }
 
     // DM the user — but skip for profanity (swift justice, no warning needed)
     if (gcfg.dmWarnings && category !== 'profanity') {
       const dmText = newStrikes === 1
         ? `Hey! 👋 Just a heads up — your message in **#${msg.channel.name}** was removed.\n\nNo big deal, just keep things friendly and mindful of others in the community. You're good! 🙂`
-        : `Hey! 👋 Your message in **#${msg.channel.name}** was removed again (this is strike ${newStrikes}).\n` +
-          (timeoutMinutes ? `You've been temporarily muted for ${timeoutMinutes} minute(s).\n` : '') +
-          `\nJust be mindful of how messages might come across to others — we want everyone to feel comfortable here. ✌️`;
+        : `Hey! 👋 Your message in **#${msg.channel.name}** was removed again (this is strike ${newStrikes}).\n\nJust be mindful of how messages might come across to others — we want everyone to feel comfortable here. ✌️`;
       try { await msg.author.send(dmText); actionsTaken.push('DM sent'); } catch {}
     }
   } else if (verdict === 'CAUTION' && gcfg.logCautionMessages) {
