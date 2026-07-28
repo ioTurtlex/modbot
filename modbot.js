@@ -1051,15 +1051,19 @@ dashApp.patch('/api/config/:guildId', (req, res) => {
 dashApp.get('/api/users', (req, res) => {
   const guildId = req.query.guildId;
   const source  = guildId ? (userRecords[guildId] || {}) : {};
-  const users   = Object.entries(source).map(([uid, record]) => ({
-    userId:        uid,
-    activeStrikes: record.violations.filter(v => {
-      const gcfg = getGuildCfg(guildId);
-      return v.ts > Date.now() - gcfg.strikeDecayDays * 86400000 && v.verdict === 'REMOVE';
-    }).length,
-    totalViolations: record.violations.length,
-    lastViolation:   record.violations.length ? record.violations[record.violations.length - 1].ts : null,
-  })).sort((a, b) => (b.lastViolation || 0) - (a.lastViolation || 0));
+  const users   = Object.entries(source).map(([uid, record]) => {
+    const lastViolation = record.violations.length ? record.violations[record.violations.length - 1] : null;
+    return {
+      userId:        uid,
+      username:      lastViolation?.username || 'Unknown',
+      activeStrikes: record.violations.filter(v => {
+        const gcfg = getGuildCfg(guildId);
+        return v.ts > Date.now() - gcfg.strikeDecayDays * 86400000 && v.verdict === 'REMOVE';
+      }).length,
+      totalViolations: record.violations.length,
+      lastViolation:   lastViolation?.ts || null,
+    };
+  }).sort((a, b) => (b.lastViolation || 0) - (a.lastViolation || 0));
   res.json(users);
 });
 
