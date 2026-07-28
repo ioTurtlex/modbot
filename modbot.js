@@ -32,7 +32,50 @@ const saveCfg     = () => saveData('config', cfg);
 const saveRecords = () => saveData('violations', userRecords);
 
 // ─── Live feed log (for dashboard) ────────────────────────────────────────────
+// Store feed in violations.json as a special "_feed" entry so it persists guaranteed
 let feedLog = [];  // last 500 analyzed messages across all guilds
+
+function loadFeed() {
+  feedLog = [];
+  // First check if feed exists in violations.json (most reliable)
+  if (userRecords._feed && Array.isArray(userRecords._feed)) {
+    feedLog = userRecords._feed;
+    console.log(`[Feed] ✓ Loaded ${feedLog.length} messages from violations.json`);
+    return;
+  }
+  
+  // Fallback: try daily archive file
+  const archivePath = getFeedLogPath();
+  if (fs.existsSync(archivePath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(archivePath, 'utf8'));
+      if (Array.isArray(data) && data.length > 0) {
+        feedLog = data;
+        console.log(`[Feed] ✓ Loaded ${feedLog.length} messages from daily archive`);
+        return;
+      }
+    } catch (e) {
+      console.error('[Feed] Error reading daily archive:', e.message);
+    }
+  }
+  
+  // Last fallback: try master feed-log
+  const masterPath = dataPath('feed-log');
+  if (fs.existsSync(masterPath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(masterPath, 'utf8'));
+      if (Array.isArray(data) && data.length > 0) {
+        feedLog = data;
+        console.log(`[Feed] ✓ Loaded ${feedLog.length} messages from master feed-log`);
+        return;
+      }
+    } catch (e) {
+      console.error('[Feed] Error reading master feed-log:', e.message);
+    }
+  }
+  
+  console.log('[Feed] No archived messages found (fresh start)');
+}
 let feedDay = new Date().toDateString(); // track which day's archive file
 
 function getFeedLogPath(date = new Date()) {
@@ -77,21 +120,21 @@ function loadFeedLog() {
 }
 
 function saveFeedLog() {
+  // PRIMARY: Save to violations.json under _feed key (GUARANTEED persistence like violations)
+  userRecords._feed = feedLog.slice(0, 500);
+  saveRecords();
+  
+  // SECONDARY: Also save to daily archive for backup
   const archivePath = getFeedLogPath();
   const masterPath = dataPath('feed-log');
   try {
-    // Ensure data directory exists
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
-    
-    // Save to today's archive (persistent)
     fs.writeFileSync(archivePath, JSON.stringify(feedLog, null, 2));
-    // Also save to master feed-log.json (for cross-day access)
     fs.writeFileSync(masterPath, JSON.stringify(feedLog.slice(0, 500), null, 2));
-    console.log(`[Feed] Saved ${feedLog.length} messages to ${archivePath}`);
   } catch (e) {
-    console.error('[Feed] SAVE ERROR:', e.message, '| Path:', archivePath);
+    console.error('[Feed] SAVE ERROR (archive):', e.message);
   }
 }
 
@@ -814,7 +857,7 @@ client.once('clientReady', () => {
   
   // Load persistent data from disk
   loadDeletionLog();
-  loadFeedLog();
+  loadFeed();  // Load feed from violations.json (guaranteed)
   backfillMissingUsernames();  // Fix old violations without usernames
   
   // Setup daily deletion log backup
