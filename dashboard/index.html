@@ -227,8 +227,9 @@
     <div id="tab-users" style="display:none">
       <div class="page-title">Users</div>
       <div class="page-sub">Users with moderation history in the selected server</div>
-      <div style="margin-bottom: 16px;">
+      <div style="margin-bottom: 16px; display: flex; gap: 8px;">
         <button class="btn danger" onclick="resetAllViolations()" style="background: var(--remove); color: white; border: none;">🗑️ Reset All Violations (Testing)</button>
+        <button class="btn danger" onclick="factoryReset()" style="background: #8B0000; color: white; border: none; font-weight: bold;">⚠️ FACTORY RESET</button>
       </div>
       <div id="users-table-wrap">
         <div class="empty">Select a server to view users</div>
@@ -538,6 +539,28 @@ async function resetAllViolations() {
     loadUsers();
     loadFeed();
   } catch(e) { toast('Error: ' + e.message, 'var(--remove)'); }
+}
+
+async function factoryReset() {
+  if (!confirm('⚠️⚠️ FACTORY RESET EVERYTHING? This will DELETE:\n- All violations\n- All feed history\n- All stats\n- All config\n\nBOT WILL START COMPLETELY FRESH.\n\nThis cannot be undone!')) return;
+  if (!confirm('ARE YOU ABSOLUTELY SURE? This is permanent!')) return;
+  
+  try {
+    console.log('[Dashboard] Initiating factory reset...');
+    const result = await api('/api/factory-reset?confirm=true', { method: 'POST' });
+    console.log('[Dashboard] Factory reset result:', result);
+    toast('💥 FACTORY RESET COMPLETE - Bot memory cleared!', 'var(--remove)');
+    
+    // Reload everything
+    setTimeout(() => {
+      loadStatus();
+      loadUsers();
+      loadFeed();
+    }, 1000);
+  } catch(e) { 
+    console.error('[Dashboard] Factory reset error:', e);
+    toast('❌ Factory reset failed: ' + e.message, 'var(--remove)'); 
+  }
 }
 
 async function restartBot() {

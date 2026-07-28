@@ -138,17 +138,46 @@ function addToFeed(entry) {
 
 // Daily stats counter (resets at midnight)
 let statsDay = new Date().toDateString();
-const dailyStats = { analyzed: 0, caution: 0, removed: 0, spam: 0 };
+let dailyStats = { analyzed: 0, caution: 0, removed: 0, spam: 0 };
+
+function saveStats() {
+  const statsPath = dataPath('stats');
+  try {
+    fs.writeFileSync(statsPath, JSON.stringify({ statsDay, dailyStats }, null, 2));
+    console.log(`[Stats] ✓ Saved: ${dailyStats.analyzed} analyzed, ${dailyStats.caution} caution, ${dailyStats.removed} removed`);
+  } catch (e) {
+    console.error('[Stats] Error saving:', e.message);
+  }
+}
+
+function loadStats() {
+  const statsPath = dataPath('stats');
+  if (!fs.existsSync(statsPath)) {
+    console.log('[Stats] No stats file found (fresh start)');
+    return;
+  }
+  try {
+    const data = JSON.parse(fs.readFileSync(statsPath, 'utf8'));
+    statsDay = data.statsDay;
+    dailyStats = data.dailyStats;
+    console.log(`[Stats] ✓ Loaded: ${dailyStats.analyzed} analyzed, ${dailyStats.caution} caution, ${dailyStats.removed} removed`);
+  } catch (e) {
+    console.error('[Stats] Error loading:', e.message);
+  }
+}
+
 function bumpStats(verdict) {
   const today = new Date().toDateString();
   if (today !== statsDay) {
     statsDay = today;
     dailyStats.analyzed = 0; dailyStats.caution = 0;
     dailyStats.removed  = 0; dailyStats.spam    = 0;
+    console.log('[Stats] ✓ Reset for new day');
   }
   dailyStats.analyzed++;
   if (verdict === 'CAUTION') dailyStats.caution++;
   if (verdict === 'REMOVE')  dailyStats.removed++;
+  saveStats(); // Persist after each change
 }
 
 // ─── Deletion Log (for transparency & recovery) ────────────────────────────────
@@ -842,7 +871,8 @@ client.once('clientReady', () => {
   
   // Load persistent data from disk
   loadDeletionLog();
-  loadFeed();  // Load feed from violations.json (guaranteed)
+  loadFeed();  // Load feed from disk
+  loadStats(); // Load daily stats from disk
   backfillMissingUsernames();  // Fix old violations without usernames
   
   // Setup daily deletion log backup
@@ -1185,6 +1215,55 @@ dashApp.get('/api/test-feed', (req, res) => {
     feedLength: feedLog.length,
     testMsg
   });
+});
+
+// POST /api/factory-reset - DANGER: Clear everything (violations, feed, stats, config)
+dashApp.post('/api/factory-reset', (req, res) => {
+  const confirmed = req.query.confirm === 'true';
+  if (!confirmed) {
+    return res.status(400).json({ 
+      error: 'Factory reset requires confirm=true query param',
+      message: 'This will DELETE all violations, feed history, stats, and config!'
+    });
+  }
+  
+  try {
+    console.log('[⚠️ FACTORY RESET] Clearing ALL data...');
+    
+    // Clear in-memory data
+    feedLog = [];
+    userRecords = {};
+    cfg = { enabled: true }; // Reset to enabled default
+    dailyStats = { analyzed: 0, caution: 0, removed: 0, spam: 0 };
+    statsDay = new Date().toDateString();
+    
+    // Delete data files from disk
+    const filesToDelete = ['feed', 'violations', 'stats', 'config'];
+    for (const name of filesToDelete) {
+      const fpath = dataPath(name);
+      if (fs.existsSync(fpath)) {
+        fs.unlinkSync(fpath);
+        console.log(`[Factory Reset] Deleted: ${fpath}`);
+      }
+    }
+    
+    // Save fresh empty configs
+    saveRecords(); // Save empty userRecords
+    saveCfg();     // Save default config
+    saveStats();   // Save reset stats
+    saveFeedLog(); // Save empty feed
+    
+    res.json({ 
+      ok: true, 
+      message: '✅ Factory reset complete! Bot is now clean.',
+      clearedData: ['violations', 'feed', 'stats', 'config']
+    });
+    
+    console.log('[✅ FACTORY RESET] Complete - bot memory cleared');
+  } catch (e) {
+    console.error('[Factory Reset] Error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // GET /api/deletions?limit=100&guildId=optional
