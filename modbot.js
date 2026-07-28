@@ -245,7 +245,8 @@ const TRIVIAL_RE = /^[\s\p{Emoji}\p{Emoji_Modifier}\p{Emoji_Component}]*$/u;
 
 function isTrivial(content) {
   const t = content.trim();
-  if (t.length < 4) return true;              // "ok", "lol", "k", emoji-only short
+  // Allow short messages — profanity can be 3 chars (e.g., "cum", "ass")
+  if (t.length < 2) return true;              // single char is truly trivial
   if (TRIVIAL_RE.test(t)) return true;        // pure emoji string
   if (/^https?:\/\/\S+$/.test(t)) return true; // bare URL, no surrounding text
   return false;
@@ -578,6 +579,7 @@ async function moderateMessage(msg) {
     verdict, severity, reason, category,
     action:      'pending',
   });
+  console.log(`[modbot] 📝 FEED: ${msg.author.username} | ${verdict} | "${msg.content.slice(0, 40)}"`);
 
   if (verdict === 'SAFE') return;
 
