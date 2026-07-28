@@ -338,7 +338,10 @@ function switchTab(tab) {
   document.getElementById(`tab-${tab}`).style.display = '';
   event.currentTarget.classList.add('active');
 
-  if (tab === 'feed')     renderFeed();
+  if (tab === 'feed') { 
+    loadFeed(); // Always reload feed when switching to feed tab
+    setTimeout(renderFeed, 100); // Render after load completes
+  }
   if (tab === 'users')    loadUsers();
   if (tab === 'settings') loadSettings();
   if (tab === 'backups')  loadBackups();

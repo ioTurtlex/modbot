@@ -1119,6 +1119,42 @@ dashApp.post('/api/restart', (req, res) => {
   }, 1000);
 });
 
+// GET /api/diagnostics - Check feed file status
+dashApp.get('/api/diagnostics', (req, res) => {
+  const feedPath = dataPath('feed');
+  const feedExists = fs.existsSync(feedPath);
+  let feedFileSize = 0;
+  let feedFileAge = null;
+  let feedFileContents = null;
+  
+  if (feedExists) {
+    const stats = fs.statSync(feedPath);
+    feedFileSize = stats.size;
+    feedFileAge = Date.now() - stats.mtime.getTime();
+    try {
+      feedFileContents = JSON.parse(fs.readFileSync(feedPath, 'utf8'));
+    } catch (e) {
+      feedFileContents = { error: e.message };
+    }
+  }
+  
+  res.json({
+    feedLog: {
+      memoryLength: feedLog.length,
+      sample: feedLog.slice(0, 3)
+    },
+    feedFile: {
+      exists: feedExists,
+      path: feedPath,
+      sizeBytes: feedFileSize,
+      ageMs: feedFileAge,
+      ageMinutes: feedFileAge ? Math.round(feedFileAge / 60000) : null,
+      contentLength: feedFileContents ? (Array.isArray(feedFileContents) ? feedFileContents.length : 'not-array') : null,
+      sample: Array.isArray(feedFileContents) ? feedFileContents.slice(0, 2) : null
+    }
+  });
+});
+
 // GET /api/deletions?limit=100&guildId=optional
 dashApp.get('/api/deletions', (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 100, 1000);
