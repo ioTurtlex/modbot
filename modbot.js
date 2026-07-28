@@ -29,6 +29,18 @@ const saveData = (name, obj) => fs.writeFileSync(dataPath(name), JSON.stringify(
 let cfg        = loadData('config');
 let userRecords = loadData('violations'); // { guildId: { userId: UserRecord } }
 
+// ─── Custom prompts & profanity (stored in config) ─────────────────────────────
+// Initialize with defaults from prompts.js
+if (!cfg.customStage1Prompt) cfg.customStage1Prompt = STAGE1_PROMPT;
+if (!cfg.customStage2Prompt) cfg.customStage2Prompt = SENSITIVITY_PROMPTS.medium;
+if (!cfg.customProfanityList) {
+  cfg.customProfanityList = [
+    'fuck', 'shit', 'bitch', 'ass', 'asshole', 'damn', 'dammit', 'goddamn', 'crap', 
+    'piss', 'bullshit', 'wtf', 'stfu', 'dick', 'pussy', 'cum', 'whore', 'slut', 
+    'bastard', 'prick', 'mierda', 'merde', 'scheiße', 'cabrón', 'putain'
+  ];
+}
+
 const saveCfg     = () => saveData('config', cfg);
 const saveRecords = () => saveData('violations', userRecords);
 
@@ -539,7 +551,7 @@ async function checkWithGPT(content) {
       temperature: 0,
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: STAGE1_PROMPT },
+        { role: 'system', content: cfg.customStage1Prompt },
         { role: 'user', content: content.slice(0, 500) }
       ]
     });
@@ -1329,6 +1341,50 @@ dashApp.post('/api/factory-reset', (req, res) => {
     console.log('[✅ FACTORY RESET] Complete - bot memory cleared');
   } catch (e) {
     console.error('[Factory Reset] Error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/prompts - Get current Stage 1 & Stage 2 prompts
+dashApp.get('/api/prompts', (req, res) => {
+  res.json({
+    stage1: cfg.customStage1Prompt,
+    stage2: cfg.customStage2Prompt,
+    profanityList: cfg.customProfanityList || []
+  });
+});
+
+// POST /api/prompts - Update Stage 1 & Stage 2 prompts
+dashApp.post('/api/prompts', (req, res) => {
+  const { stage1, stage2 } = req.body;
+  if (!stage1 || !stage2) {
+    return res.status(400).json({ error: 'stage1 and stage2 prompts are required' });
+  }
+  try {
+    cfg.customStage1Prompt = stage1;
+    cfg.customStage2Prompt = stage2;
+    saveCfg();
+    console.log('[Settings] ✅ OpenAI prompts updated');
+    res.json({ ok: true, message: '✅ Prompts updated successfully!' });
+  } catch (e) {
+    console.error('[Settings] Error updating prompts:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/profanity - Update profanity list
+dashApp.post('/api/profanity', (req, res) => {
+  const { profanityList } = req.body;
+  if (!Array.isArray(profanityList)) {
+    return res.status(400).json({ error: 'profanityList must be an array' });
+  }
+  try {
+    cfg.customProfanityList = profanityList.map(w => w.toLowerCase().trim()).filter(w => w);
+    saveCfg();
+    console.log(`[Settings] ✅ Profanity list updated (${cfg.customProfanityList.length} words)`);
+    res.json({ ok: true, message: `✅ Profanity list updated (${cfg.customProfanityList.length} words)` });
+  } catch (e) {
+    console.error('[Settings] Error updating profanity:', e.message);
     res.status(500).json({ error: e.message });
   }
 });

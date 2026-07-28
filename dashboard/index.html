@@ -183,6 +183,9 @@
       <button class="nav-item" onclick="switchTab('settings')">
         <span class="icon">⚙️</span> Settings
       </button>
+      <button class="nav-item" onclick="switchTab('prompts')">
+        <span class="icon">🧠</span> Prompts
+      </button>
     </nav>
     <div class="guild-selector">
       <select id="guildSelect" onchange="onGuildChange()">
@@ -268,6 +271,39 @@
       <div class="page-title">Settings</div>
       <div class="page-sub">Configure moderation for the selected server. Changes save immediately.</div>
       <div id="settings-content"><div class="empty">Select a server to configure</div></div>
+    </div>
+
+    <!-- Prompts & Profanity Tab -->
+    <div id="tab-prompts" style="display:none">
+      <div class="page-title">🧠 OpenAI Prompts & Profanity</div>
+      <div class="page-sub">Edit the moderation prompts and profanity list</div>
+      <div class="settings-grid">
+        
+        <!-- Profanity List Editor -->
+        <div class="settings-card full">
+          <h3>🚫 Profanity List</h3>
+          <div class="desc" style="margin-bottom: 12px;">Words that trigger automatic REMOVE (comma-separated). Already include: damn, dammit, goddamn, etc.</div>
+          <textarea id="profanity-list" style="width: 100%; height: 120px; padding: 10px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; font-family: monospace; font-size: 12px; resize: vertical;"></textarea>
+          <button class="save-btn" onclick="saveProfanityList()" style="margin-top: 12px;">✅ Save Profanity List</button>
+        </div>
+
+        <!-- Stage 1 Prompt Editor -->
+        <div class="settings-card full">
+          <h3>📋 Stage 1 Prompt (Explicit Content Classifier)</h3>
+          <div class="desc" style="margin-bottom: 12px;">Context-free check for profanity, hate speech, self-harm, explicit sexual content</div>
+          <textarea id="stage1-prompt" style="width: 100%; height: 300px; padding: 10px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; font-family: monospace; font-size: 12px; resize: vertical;"></textarea>
+          <button class="save-btn" onclick="savePrompts()" style="margin-top: 12px;">✅ Save Stage 1 Prompt</button>
+        </div>
+
+        <!-- Stage 2 Prompt Editor -->
+        <div class="settings-card full">
+          <h3>📋 Stage 2 Prompt (Context-Aware Moderation)</h3>
+          <div class="desc" style="margin-bottom: 12px;">Context-aware check for romantic targeting and interpersonal conflict</div>
+          <textarea id="stage2-prompt" style="width: 100%; height: 300px; padding: 10px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; font-family: monospace; font-size: 12px; resize: vertical;"></textarea>
+          <button class="save-btn" onclick="savePrompts()" style="margin-top: 12px;">✅ Save Stage 2 Prompt</button>
+        </div>
+
+      </div>
     </div>
 
     <!-- Backups Tab -->
@@ -440,6 +476,7 @@ function switchTab(tab) {
   }
   if (tab === 'users')    loadUsers();
   if (tab === 'settings') loadSettings();
+  if (tab === 'prompts')  loadPrompts();
   if (tab === 'backups')  loadBackups();
 }
 
@@ -690,6 +727,74 @@ async function restartBot() {
     toast('❌ Restart failed: ' + e.message, 'var(--remove)'); 
   }
 }
+
+// ── Prompts & Profanity Management ───────────────────────────────────────────
+async function loadPrompts() {
+  try {
+    const data = await api('/api/prompts');
+    document.getElementById('stage1-prompt').value = data.stage1;
+    document.getElementById('stage2-prompt').value = data.stage2;
+    document.getElementById('profanity-list').value = data.profanityList.join(', ');
+    console.log('[Dashboard] ✅ Loaded prompts and profanity list');
+  } catch (e) {
+    console.error('[Dashboard] Error loading prompts:', e);
+    toast('❌ Failed to load prompts: ' + e.message, 'var(--remove)');
+  }
+}
+
+async function savePrompts() {
+  const stage1 = document.getElementById('stage1-prompt').value.trim();
+  const stage2 = document.getElementById('stage2-prompt').value.trim();
+  
+  if (!stage1 || !stage2) {
+    toast('❌ Both prompts are required', 'var(--remove)');
+    return;
+  }
+  
+  try {
+    const result = await api('/api/prompts', {
+      method: 'POST',
+      body: JSON.stringify({ stage1, stage2 })
+    });
+    toast('✅ OpenAI prompts saved successfully!', 'var(--safe)');
+    console.log('[Dashboard] ✅ Prompts saved:', result);
+  } catch (e) {
+    console.error('[Dashboard] Error saving prompts:', e);
+    toast('❌ Failed to save prompts: ' + e.message, 'var(--remove)');
+  }
+}
+
+async function saveProfanityList() {
+  const input = document.getElementById('profanity-list').value.trim();
+  
+  if (!input) {
+    toast('❌ Profanity list cannot be empty', 'var(--remove)');
+    return;
+  }
+  
+  const profanityList = input
+    .split(',')
+    .map(word => word.trim().toLowerCase())
+    .filter(word => word.length > 0);
+  
+  if (profanityList.length === 0) {
+    toast('❌ No valid words in profanity list', 'var(--remove)');
+    return;
+  }
+  
+  try {
+    const result = await api('/api/profanity', {
+      method: 'POST',
+      body: JSON.stringify({ profanityList })
+    });
+    toast(`✅ Profanity list saved (${profanityList.length} words)!`, 'var(--safe)');
+    console.log('[Dashboard] ✅ Profanity list saved:', profanityList);
+  } catch (e) {
+    console.error('[Dashboard] Error saving profanity:', e);
+    toast('❌ Failed to save profanity list: ' + e.message, 'var(--remove)');
+  }
+}
+
 
 // ── Load settings ─────────────────────────────────────────────────────────────
 async function loadSettings() {
