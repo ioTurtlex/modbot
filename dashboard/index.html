@@ -170,7 +170,10 @@
     <!-- Overview Tab -->
     <div id="tab-overview">
       <div class="page-title">Overview</div>
-      <div class="page-sub" id="bot-status-line">Loading...</div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div class="page-sub" id="bot-status-line">Loading...</div>
+        <button class="btn" onclick="restartBot()" style="padding: 6px 12px; font-size: 12px; white-space: nowrap;">🔄 Restart Bot</button>
+      </div>
       <div class="stats-grid">
         <div class="stat-card blue">
           <div class="label">Messages Today</div>
@@ -524,11 +527,37 @@ async function clearUser(userId) {
 
 async function resetAllViolations() {
   if (!currentGuildId) { toast('Select a server first', 'var(--remove)'); return; }
-  if (!confirm('⚠️ RESET ALL violations for this server? (Cannot undo)')) return;
+  if (!confirm('⚠️ RESET ALL violations for this server? This gives everyone a clean slate. Cannot undo!')) return;
   try {
-    await api(`/api/violations?guildId=${currentGuildId}`, { method: 'DELETE' });
-    toast('✅ All violations cleared for this server');
+    const result = await api(`/api/violations?guildId=${currentGuildId}`, { method: 'DELETE' });
+    toast('✅ All violations cleared - everyone has a clean slate', 'var(--safe)');
+    console.log('[Dashboard] Reset result:', result);
     loadUsers();
+    loadFeed();
+  } catch(e) { toast('Error: ' + e.message, 'var(--remove)'); }
+}
+
+async function restartBot() {
+  if (!confirm('🔄 Restart the bot? It will be offline for ~10 seconds.')) return;
+  try {
+    await api(`/api/restart`, { method: 'POST' });
+    toast('🔄 Bot restarting... (will be back online in ~10 seconds)', 'var(--caution)');
+    // Poll for reconnection
+    let attempts = 0;
+    const checkConnection = setInterval(async () => {
+      attempts++;
+      try {
+        await api('/api/status');
+        clearInterval(checkConnection);
+        toast('✅ Bot is back online!', 'var(--safe)');
+        loadStatus();
+      } catch (e) {
+        if (attempts > 30) {
+          clearInterval(checkConnection);
+          toast('Bot did not reconnect - check server logs', 'var(--remove)');
+        }
+      }
+    }, 1000);
   } catch(e) { toast('Error: ' + e.message, 'var(--remove)'); }
 }
 

@@ -1097,6 +1097,28 @@ dashApp.delete('/api/violations/:userId', (req, res) => {
   res.json({ ok: true });
 });
 
+// DELETE /api/violations?guildId=XXX (reset ALL violations for a guild)
+dashApp.delete('/api/violations', (req, res) => {
+  const guildId = req.query.guildId;
+  if (!guildId) return res.status(400).json({ error: 'guildId required' });
+  
+  // Completely clear all users' violations for this guild
+  if (userRecords[guildId]) {
+    userRecords[guildId] = {};
+  }
+  saveRecords();
+  res.json({ ok: true, message: `All violations cleared for guild ${guildId}` });
+});
+
+// POST /api/restart - Restart the bot (graceful shutdown, systemd/pm2 will restart)
+dashApp.post('/api/restart', (req, res) => {
+  res.json({ ok: true, message: 'Bot restarting...' });
+  console.log('[Admin] 🔄 Restart requested via dashboard');
+  setTimeout(() => {
+    process.exit(0); // Exit with code 0 (success) - Railway/PM2 will auto-restart
+  }, 1000);
+});
+
 // GET /api/deletions?limit=100&guildId=optional
 dashApp.get('/api/deletions', (req, res) => {
   const limit = Math.min(parseInt(req.query.limit) || 100, 1000);
