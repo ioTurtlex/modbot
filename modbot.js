@@ -172,8 +172,8 @@ function checkDeletionRateLimit(guildId) {
   
   limiter.count++;
   
-  // Alert if >5 deletions per minute
-  if (limiter.count > 5) {
+  // Alert if >20 deletions per minute (allows handling profanity spam bursts)
+  if (limiter.count > 20) {
     console.warn(`[modbot] ⚠️  ALERT: ${limiter.count} deletions in the last minute! Possible bug or cascade delete.`);
     return false;  // Pause deletion
   }
@@ -510,7 +510,9 @@ async function handleAction(msg, guildId, verdict, severity, reason, category, m
         const member = await guild.members.fetch(uid);
         const timed  = await applyTimeout(member, timeoutMinutes, reason);
         if (timed) actionsTaken.push(`${timeoutMinutes}min timeout`);
-      } catch {}
+      } catch (err) {
+        console.error(`[modbot] Failed to timeout member: ${err.message}`);
+      }
     }
 
     // DM the user — but skip for profanity (swift justice, no warning needed)
