@@ -32,10 +32,48 @@ const saveCfg     = () => saveData('config', cfg);
 const saveRecords = () => saveData('violations', userRecords);
 
 // ─── Live feed log (for dashboard) ────────────────────────────────────────────
-const feedLog = [];  // last 500 analyzed messages across all guilds
+let feedLog = [];  // last 500 analyzed messages across all guilds
+let feedDay = new Date().toDateString(); // track which day's archive file
+
+function getFeedLogPath(date = new Date()) {
+  const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
+  return path.join(DATA_DIR, `feed-log-${dateStr}.json`);
+}
+
+function loadFeedLog() {
+  const archivePath = getFeedLogPath();
+  if (fs.existsSync(archivePath)) {
+    try {
+      feedLog = JSON.parse(fs.readFileSync(archivePath, 'utf8')) || [];
+      console.log(`[Feed] Loaded ${feedLog.length} messages from today's archive`);
+    } catch (e) {
+      console.error('[Feed] Failed to load archive:', e.message);
+    }
+  }
+}
+
+function saveFeedLog() {
+  const archivePath = getFeedLogPath();
+  try {
+    fs.writeFileSync(archivePath, JSON.stringify(feedLog, null, 2));
+    // Also save master feed-log.json for quick API access
+    fs.writeFileSync(dataPath('feed-log'), JSON.stringify(feedLog.slice(0, 500), null, 2));
+  } catch (e) {
+    console.error('[Feed] Failed to save:', e.message);
+  }
+}
+
 function addToFeed(entry) {
   feedLog.unshift(entry); // newest first
   if (feedLog.length > 500) feedLog.pop();
+  
+  // Check if day changed — rotate to new archive file
+  const today = new Date().toDateString();
+  if (today !== feedDay) {
+    feedDay = today;
+  }
+  
+  saveFeedLog(); // save to disk after each entry
 }
 
 // Daily stats counter (resets at midnight)
@@ -724,8 +762,9 @@ client.once('clientReady', () => {
   console.log(`🛡️ ModBot online as ${client.user.tag}`);
   console.log(`   Monitoring ${client.guilds.cache.size} server(s)`);
   
-  // Load deletion log from persistent storage
+  // Load persistent data from disk
   loadDeletionLog();
+  loadFeedLog();
   
   // Setup daily deletion log backup
   setInterval(backupDeletionLog, 24 * 60 * 60 * 1000);  // backup every 24 hours
