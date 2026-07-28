@@ -41,35 +41,51 @@ function getFeedLogPath(date = new Date()) {
 }
 
 function loadFeedLog() {
+  feedLog = [];
   const archivePath = getFeedLogPath();
+  const masterPath = dataPath('feed-log');
+  
+  // Try today's archive first
   if (fs.existsSync(archivePath)) {
     try {
-      feedLog = JSON.parse(fs.readFileSync(archivePath, 'utf8')) || [];
-      console.log(`[Feed] Loaded ${feedLog.length} messages from today's archive`);
-      return;
+      const data = JSON.parse(fs.readFileSync(archivePath, 'utf8'));
+      if (Array.isArray(data) && data.length > 0) {
+        feedLog = data;
+        console.log(`[Feed] ✓ Loaded ${feedLog.length} messages from today's archive`);
+        return;
+      }
     } catch (e) {
-      console.error('[Feed] Failed to load today\'s archive:', e.message);
+      console.error('[Feed] Error reading today\'s archive:', e.message);
     }
   }
-  const masterPath = dataPath('feed-log');
+  
+  // Fallback: load from master feed-log (cross-day persistence)
   if (fs.existsSync(masterPath)) {
     try {
-      feedLog = JSON.parse(fs.readFileSync(masterPath, 'utf8')) || [];
-      console.log(`[Feed] Loaded ${feedLog.length} messages from master feed-log`);
+      const data = JSON.parse(fs.readFileSync(masterPath, 'utf8'));
+      if (Array.isArray(data) && data.length > 0) {
+        feedLog = data;
+        console.log(`[Feed] ✓ Loaded ${feedLog.length} messages from master feed-log (cross-day)`);
+        return;
+      }
     } catch (e) {
-      console.error('[Feed] Failed to load master feed-log:', e.message);
+      console.error('[Feed] Error reading master feed-log:', e.message);
     }
   }
+  
+  console.log('[Feed] No archived messages found (fresh start)');
 }
 
 function saveFeedLog() {
   const archivePath = getFeedLogPath();
+  const masterPath = dataPath('feed-log');
   try {
+    // Save to today's archive (persistent)
     fs.writeFileSync(archivePath, JSON.stringify(feedLog, null, 2));
-    // Also save master feed-log.json for quick API access
-    fs.writeFileSync(dataPath('feed-log'), JSON.stringify(feedLog.slice(0, 500), null, 2));
+    // Also save to master feed-log.json (for cross-day access)
+    fs.writeFileSync(masterPath, JSON.stringify(feedLog.slice(0, 500), null, 2));
   } catch (e) {
-    console.error('[Feed] Failed to save:', e.message);
+    console.error('[Feed] SAVE ERROR:', e.message);
   }
 }
 
@@ -1052,10 +1068,18 @@ dashApp.get('/api/users', (req, res) => {
   const guildId = req.query.guildId;
   const source  = guildId ? (userRecords[guildId] || {}) : {};
   const users   = Object.entries(source).map(([uid, record]) => {
+    // Find latest violation with username, or use uid as fallback
+    let username = uid.slice(0, 8); // default to uid slice
+    for (let i = record.violations.length - 1; i >= 0; i--) {
+      if (record.violations[i].username) {
+        username = record.violations[i].username;
+        break;
+      }
+    }
     const lastViolation = record.violations.length ? record.violations[record.violations.length - 1] : null;
     return {
       userId:        uid,
-      username:      lastViolation?.username || 'Unknown',
+      username:      username,
       activeStrikes: record.violations.filter(v => {
         const gcfg = getGuildCfg(guildId);
         return v.ts > Date.now() - gcfg.strikeDecayDays * 86400000 && v.verdict === 'REMOVE';
